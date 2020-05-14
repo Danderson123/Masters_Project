@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue May 12 11:37:24 2020
-
-@author: danielanderson
-"""
-
 import re 
 
 gff = "D39V.gff3"
@@ -56,9 +48,3 @@ outfile = open('D39V_cleaned.gff','w')
 outfile.write(cleaned_gffs)
 outfile.close()
 
-f = str((open('D39V.fasta','r').read())) 
-len(f) / 3
-list(set(line))
-line = f.strip('\n')
-
-len(str((open('D39V.fasta','r').read())))
