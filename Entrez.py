@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue May 12 17:49:12 2020
-
-@author: danielanderson
-"""
-
 from Bio import Entrez
 from Bio import SeqIO
 
