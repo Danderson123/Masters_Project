@@ -6,6 +6,9 @@ Created on Wed May 20 16:33:34 2020
 @author: danielanderson
 """
 
+#Panaroo returns errors when trying to generate a gml file from a single gff. 
+#This script generates a single gml for use in the graph merger function. 
+
 from prokka import process_prokka_input
 import os
 from cdhit import run_cdhit
@@ -34,8 +37,35 @@ G_single, centroid_contexts_single, seqid_to_centroid_single = generate_network(
     prot_seq_file=output_dir + "single_protein_CDS.fasta",
     all_dna=False)
 
-G_multi = nx.read_gml('results/final_graph.gml')
-G = ['G_single','G_multi']
+for adj in G_single._adj:
+    for x in G_single._adj[adj]:
+        y = G_single._adj[adj][x]
+    
+        y.pop('members')
+        zero = {'members': 0}
+        y.update(zero)
+    
+        genomes = {'genomeIDs' : '0'}
+        y.update(genomes)
+    
+for node in G_single._node:
+    y = G_single._node[node]
+    y.pop('members')
+    
+    zero = {'members': 0}
+    y.update(zero)
+    
+    rep = "[']"
+    for char in rep:
+        y['centroid'] = (str(y['centroid'])).replace(char, '')
+        y['dna'] = (str(y['dna'])).replace(char, '')
+        y['protein'] = (str(y['protein'])).replace(char, '')
+    
+    y['hasEnd'] = int(y['hasEnd'])
+    y['mergedDNA'] = int(y['mergedDNA'])
+    y['paralog'] = int(y['paralog'])
+    
+    y['longCentroidID'] = list(y['longCentroidID'])
+    y['seqIDs'] = list(y['seqIDs'])
 
-clusters = cluster_centroids(G, output_dir)
-G_combined = simple_merge_graphs(G)
+nx.write_gml(G_single, output_dir + "single_graph.gml") #members are assigned as inhibitset[0]. needs to be 0
