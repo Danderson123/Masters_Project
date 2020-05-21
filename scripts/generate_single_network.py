@@ -17,7 +17,7 @@ files = ['15902044.gff'] #Supply gff filename as a list
 
 output_dir = str(os.getcwd()) + '/' #output directory is current working directory  
 
-process_prokka_input(files,output_dir, '', 1) #run function on a single gff file with one core  
+process_prokka_input(files,output_dir, '', 1) #run function on a single gff file with one cpu  
 
 # Cluster protein sequences using cdhit
 cd_hit_out = output_dir + "single_protein_cdhit_out.txt"
