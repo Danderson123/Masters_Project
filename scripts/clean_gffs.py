@@ -15,7 +15,7 @@ def replace_all(text, dic):
         text = text.replace(i, j)
     return text
 
-d = {"Dbxref=": "dbxref=", "Notes=": "note=", "old_locus_tag":"remove"}
+d = {"Dbxref=": "dbxref=", "Notes=": "note="}
 D39V = replace_all(D39V, d) #Ensure GFF annotation format is consistent with prokka output
 
 gene_list = D39V.splitlines() 
