@@ -153,7 +153,7 @@ def main():
     accessions = args.accessions.split(',')
     
     if isinstance(accessions, str):
-        headers = genome_downloader(args.email, accessions, int(args.number))
+        headers = genome_downloader(args.email, accessions, (int(args.number) + 1))
     elif isinstance(accessions, list): 
          headers = []
          for accession in accessions:
