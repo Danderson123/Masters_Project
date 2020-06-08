@@ -51,6 +51,9 @@ def get_options(): #options for downloading and cleaning
     return (args)
 
 def genome_downloader(email, accession, number):
+    
+   """Searches for available GFF files and retrieves fastas only for these"""
+
     from Bio import Entrez
     import os
     import urllib.request
@@ -96,6 +99,8 @@ def genome_downloader(email, accession, number):
 
 def split_contigs(headers, input_dir, output_dir):
     
+    """Most annotations are incomplete and consist of multiple contigs. Panaroo only accepts single genomic regions."""
+    
     for header in headers:
         d = {"[": "", "]": "", " ": "", "'": ""}
         header = replace_all(header, d)
@@ -130,6 +135,7 @@ def split_contigs(headers, input_dir, output_dir):
 
 def clean_gffs(input_dir, output_dir):
     
+    """Remove non-CDS annotations and CDSs that are not divisible by 3"""
     import re 
     import glob 
     import os
