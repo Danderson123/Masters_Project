@@ -50,7 +50,13 @@ def get_options(): #options for downloading and cleaning
                          required=False,
                          help="maximum number of sequences to retrieve",
                          default=100)
-    
+     
+        parser.add_argument("--dirty",
+                          dest="dirty",
+                          help="keep temporary directory containing raw genome files and split contigs",
+                          action='store_true',
+                          default=False)
+        
     args = parser.parse_args()
     
     return (args)
@@ -205,35 +211,51 @@ def main():
     start = time.time()
     args = get_options()
     
-    # make sure trailing forward slash is present
+    args.number = args.number + 1
+    
+    if not os.path.exists(args.output_dir):
+        os.mkdir(args.output_dir)
+        
     args.output_dir = os.path.join(args.output_dir, "")
-
-    current_dir = os.getcwd() + '/'
-    os.makedirs(str(current_dir + 'raw_files'))
-    os.makedirs(str(current_dir + 'contigs'))
-    os.makedirs(str(current_dir + args.output_dir))
+    temp_dir = os.path.join(tempfile.mkdtemp(dir=args.output_dir), "")
+    
+    # create directories if they aren't present already
+    if not os.path.exists(args.output_dir):
+        os.mkdir(args.output_dir)
+        
+    os.makedirs(str(temp_dir + 'raw_files'))
+    os.makedirs(str(temp_dir + 'contigs'))
+    os.makedirs(str(args.output_dir))
+    
     accessions = args.accessions.replace('"', "")
     accessions = args.accessions.split(',')
     
     print("Retrieving Sequences")
     
     if isinstance(accessions, str):
-        headers = genome_downloader(args.email, accessions, int(args.number))
+        headers = genome_downloader(args.email, 
+                                    accessions, 
+                                    int(args.number))
     elif isinstance(accessions, list): 
          headers = []
          for accession in accessions:
-             headers.append(str(genome_downloader(args.email, accession, (int(args.number)+1))))#, args.complete)
+             headers.append(str(genome_downloader(args.email,
+                                                  accession, 
+                                                  int(args.number))))
    
     headers = headers[0].split(',')
     print(('found {} ids').format(len(headers)))
     
     print("Separating contigs")
     
-    split_contigs(headers,'raw_files', 'contigs')
+    split_contigs(headers,
+                  temp_dir + 'raw_files', 
+                  temp_dir + 'contigs')
     
     print("Processing GFF files")
     
-    clean_gffs('contigs', args.output_dir)
+    clean_gffs(temp_dir + 'contigs', 
+               args.output_dir)
     
     print("Done")
     end = time.time()
