@@ -5,6 +5,11 @@ This script downloads fasta and gff files in fasta format for accessions of inte
 """
 import time
 import os
+from Bio import Entrez
+import urllib.request
+import subprocess
+import re 
+import glob 
 
 from .integrate import replace_all
 
@@ -53,11 +58,6 @@ def get_options(): #options for downloading and cleaning
 def genome_downloader(email, accession, number):
     
    """Searches for available GFF files and retrieves fastas only for these"""
-
-    from Bio import Entrez
-    import os
-    import urllib.request
-    import subprocess
 
     Entrez.email = email
     
@@ -136,9 +136,6 @@ def split_contigs(headers, input_dir, output_dir):
 def clean_gffs(input_dir, output_dir):
     
     """Remove non-CDS annotations and CDSs that are not divisible by 3"""
-    import re 
-    import glob 
-    import os
     
     #Import and process annotations
     path_gff = 'contigs' + "/*.gff"
