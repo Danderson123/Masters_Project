@@ -127,17 +127,6 @@ def get_gene_sequences(gff_file_name, file_number):
                 scaffold_genes[scaffold_id] = scaffold_genes.get(
                     scaffold_id, [])
                 scaffold_genes[scaffold_id].append(gene_record)
-    
-    to_remove = []
-    #Remove clusters that do not start with ATG
-    for key, value in scaffold_genes.items():
-        for thing in value:
-                if not thing[1]._seq[0:3] =='ATG':
-                    to_remove.append(value.index(thing))
-
-    for index in sorted(to_remove, reverse=True):
-        for key, value in scaffold_genes.items():
-            del value[index]
         
     for scaffold in scaffold_genes:
         scaffold_genes[scaffold] = sorted(scaffold_genes[scaffold],
