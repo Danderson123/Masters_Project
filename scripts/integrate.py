@@ -8,7 +8,6 @@ import tempfile
 import networkx as nx
 import shutil
 import sys
-import subprocess
 
 from .__init__ import __version__
 from .prokka import process_prokka_input
@@ -17,7 +16,7 @@ from .generate_network import generate_network
 from .isvalid import *
 from .merge_graphs import merge_graphs
 
-def get_options(args): #options for integrating (combination of merge graph and cdhit options
+def get_options(): #options for integrating (combination of merge graph and cdhit options
    
     import argparse
 
@@ -48,7 +47,7 @@ def get_options(args): #options for integrating (combination of merge graph and 
                          dest="output_dir",
                          required=True,
                          help="location of a new output directory",
-                         type=lambda x: is_valid_folder(parser, x))
+                         type=str)
 
     matching = parser.add_argument_group('Matching')
 
@@ -209,7 +208,7 @@ def reformat_network(single_gml, output_dir, isolateName): #Generate network out
     return single_gml
 
 def main(): #Takes a single GFF input, generates a graph and merges with a pre-existing graph
-    args = get_options(sys.argv[1:])
+    args = get_options()
     
     # create directory if it isn't present already
     if not os.path.exists(args.output_dir):
