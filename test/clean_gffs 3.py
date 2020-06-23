@@ -21,7 +21,7 @@ def clean_gffs(genome_id, gff_filename, input_fastas, input_gffs, output_dir):
     stored = replace_all(stored, d) #Ensure GFF annotation format is consistent with prokka output
     
     gene_list = stored.splitlines() 
-    title = gene_list[7]
+    title = gene_list[7:8]
     gene_list = gene_list[9:-1] #remove non-essential content
     
     genes = []

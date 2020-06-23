@@ -21,13 +21,14 @@ def clean_gffs(genome_id, gff_filename, input_fastas, input_gffs, output_dir):
     stored = replace_all(stored, d) #Ensure GFF annotation format is consistent with prokka output
     
     gene_list = stored.splitlines() 
-    title = gene_list[7]
+    title = gene_list[5]
     gene_list = gene_list[9:-1] #remove non-essential content
     
     genes = []
     
     for y in range(len(gene_list)):
         if re.split(r'\t+', gene_list[y])[2] == 'gene':
+            print(y)
             genes.append(gene_list[y])
     
     cleaned_gffs = "\n".join(str(z) for z in genes)
