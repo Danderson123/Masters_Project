@@ -87,15 +87,22 @@ def position_finder(sequence, fasta_information_forward, fasta_information_rever
         strand = ''
     return start_position, end_position, strand
 
-def line(start, end, strand, ID, name, sequence_region, file):
+def gff_row(start, end, strand, ID, name, sequence_region):
     gff_line = sequence_region + '\t' + 'Panaroo' + '\t' + 'CDS' + '\t' + str(start) + '\t' + str(end) + '\t' + '.' + '\t' + str(strand) + '\t' + '.' + '\t' + ID + ';' + 'Name=' + name + ';' + 'gbkey=Gene' + ';' + 'gene_biotype=protein_coding' #+ ';' + 'locus_tag='
-    file.append(gff_line)
-    return    
+    return gff_line
     
 def generate_library(graph_path, alignement_path):
     
     G = nx.read_gml(graph_path + "final_graph.gml")
     
+    single_hypotheticals = []
+    for node in tqdm(G._node):
+        y = G._node[node]
+        if y["description"] == 'hypothetical protein':
+            if isinstance(y["seqIDs"], str):
+                single_hypotheticals.append(node)
+    G.remove_nodes_from(single_hypotheticals)
+
     refound_genes = []    
     for node in G._node:
         y = G._node[node]
@@ -118,7 +125,7 @@ def generate_library(graph_path, alignement_path):
             dictionary = {"Isolates" : isolates, "clusters": cluster, "Sequences" : sequence}
         library[refound_genes[refound_gene]] = dictionary
     
-    return library
+    return library, G
 
 def update_gff(isolate, input_gffs, library, output_dir):
         
@@ -136,53 +143,95 @@ def update_gff(isolate, input_gffs, library, output_dir):
         to_update = gff.read()
 
     split = to_update.split("##FASTA")
+    split_fasta = (split[1].split(">"))[1:]
+    lines = split[0].splitlines()
     
-    fasta_information_forward = "".join(split[1].splitlines()[2:])
-    fasta_information_reverse = reverse_complement(fasta_information_forward)
-    gff_information = split[0].splitlines()
+    titles = []
+    for line in range(len(lines)):
+        if "##sequence-region" in lines[line]:
+                titles.append(lines[line])
+                end_title_line = line
+    
+    annotations = lines[end_title_line + 1:]
+
+    annotation_indexes = []
+    for annotation in range(len(annotations) - 1):
+        if not (annotations[annotation].split("\t")[0]) == (annotations[annotation + 1].split("\t")[0]):
+            annotation_indexes.append(annotation)
+    
+    annotation_indexes.append(len(annotations) - 1)
+    annotations_split = []
+    start_index = 0
+    for index in range(len(annotation_indexes)):
+        end = annotation_indexes[index] + 1
+        item = slice(start_index, end)
+        start_index = end
+        annotations_split.append(annotations[item])
+    
+    contigs = []
+    for title in range(len(titles)):
+        fasta_information_forward = "".join(split_fasta[title].split('\n')[1:])
+        fasta_information_reverse = reverse_complement(fasta_information_forward)
+        gff_information = annotations_split[title]
         
-    index_to_remove = 0
-    for split_line in range(len(gff_information)):
-        if '##' in gff_information[split_line]:
-            index_to_remove = split_line
-    title = gff_information[0:index_to_remove + 1]           
-    gff_information = gff_information[index_to_remove + 1:]
-    
-    for title_line in range(len(title)):
-       if "sequence-region" in title[title_line]:
-           sequence_region = title[title_line].split(" ")[1]
+        sequence_region = titles[title].split(" ")[1]
+        refound_DataFrame = pd.DataFrame(isolate_genes, columns = ['name'])
+        refound_DataFrame['sequence'] = isolate_gene_sequence
+        refound_DataFrame['ID'] = 'ID='
         
-    refound_DataFrame = pd.DataFrame(isolate_genes, columns = ['name'])
-    refound_DataFrame['sequence'] = isolate_gene_sequence
-    refound_DataFrame['ID'] = 'ID='
-      
-    #refound_DataFrame['start'] , refound_DataFrame['end'], refound_DataFrame['strand'] = refound_DataFrame.apply(lambda row: position_finder(row['sequence'], fasta_information_forward, fasta_information_reverse), axis=1 , result_type="expand")
-    
-    refound_DataFrame['searched'] = refound_DataFrame['sequence'].apply(position_finder, args=[fasta_information_forward, fasta_information_reverse])
-    
-    start = []
-    end = []
-    strand = []
-    
-    for search in refound_DataFrame['searched']:
-        start.append(search[0])
-        end.append(search[1])
-        strand.append(search[2])
+        refound_DataFrame['searched'] = refound_DataFrame['sequence'].apply(position_finder, args=[fasta_information_forward, fasta_information_reverse])
+        start = []
+        end = []
+        strand = []
         
-    refound_DataFrame['start'] = start
-    refound_DataFrame['end'] = end
-    refound_DataFrame['strand'] = strand
-    
-    refound_DataFrame.apply(lambda row: line(row["start"], row["end"], row['strand'], row['ID'], row['name'], sequence_region, gff_information), axis=1)
-    
-    gff_information = sorted(gff_information, key=lambda x: x.split('\t')[3])
-    
+        for search in refound_DataFrame['searched']:
+            start.append(search[0])
+            end.append(search[1])
+            strand.append(search[2])
+            
+        refound_DataFrame['start'] = start
+        refound_DataFrame['end'] = end
+        refound_DataFrame['strand'] = strand
+        
+        for annotation_row, row in refound_DataFrame.iterrows():
+            if not row['end'] == 0:
+                gff_information.append(gff_row(row["start"], row["end"], row['strand'], row['ID'], row['name'], sequence_region))
+            else:
+                pass
+        
+        gff_information = "\n".join(sorted(gff_information, key=lambda x: x.split('\t')[3]))
+        contigs.append(titles[title] + "\n" + gff_information)
     with open(output_dir + '/' + filename, 'w') as f:
-        for item in gff_information:
+        for item in contigs:
             f.write("%s\n" % item)
                 
     return
 
+def gene_frequencies(graph, output_dir):
+    gene_names = []
+    frequencies = []
+    
+    for value in graph.graph.values():
+        num_isolates = len(value)
+                           
+    for node in tqdm(graph._node):
+        y = graph._node[node]
+        gene_names.append(y["name"].lower())
+        num_sequences = y["seqIDs"]
+        unique = set()
+        for x in range(len(num_sequences)):
+            unique.add(num_sequences[x].split("_")[0])
+        frequency = (len(unique)/num_isolates) * 100
+        frequencies.append(frequency)
+        
+    gene_table = pd.DataFrame(gene_names, columns = ["Gene Name"])
+    gene_table["Frequency (%)"] = frequencies
+    
+    gene_table = gene_table.sort_values(by='Gene Name')
+    
+    gene_table.to_csv(output_dir + "/"+ "Gene_frequencies.csv", index=False)
+
+    return 
 
 def main():
     
@@ -202,7 +251,7 @@ def main():
     
     print("Generating library...")
     
-    library = generate_library(args.graph_dir, args.aln_dir)
+    library, G = generate_library(args.graph_dir, args.aln_dir)
     
     print("Library generated")
     
@@ -219,6 +268,10 @@ def main():
         except:
             print("Error with {}.gff".format(isolate))
             pass
+     
+    print("Calculating gene frequencies...")
+    
+    gene_frequencies(G, args.output_dir)
     
     end = time.time()
     print(end - start)

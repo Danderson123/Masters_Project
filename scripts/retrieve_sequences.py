@@ -13,6 +13,7 @@ import shutil
 import tempfile
 from tqdm import tqdm
 import gzip
+import pandas as pd
 
 from .integrate import replace_all
 
@@ -80,12 +81,12 @@ def genome_downloader(email, accession, number, output_dir):
     outfile.write('\n'.join(assembly_ids))
     outfile.close()
     
-    for assembly_id in tqdm(assembly_ids):
-            
+    for assembly_id in assembly_ids:#tqdm(assembly_ids):
         esummary_handle = Entrez.esummary(db="assembly", id=assembly_id, report="full")
         esummary_record = Entrez.read(esummary_handle, validate = False)
 
         url = esummary_record['DocumentSummarySet']['DocumentSummary'][0]['FtpPath_RefSeq']
+        
         if url == '':
             url = esummary_record['DocumentSummarySet']['DocumentSummary'][0]['FtpPath_GenBank']
             
@@ -105,7 +106,13 @@ def genome_downloader(email, accession, number, output_dir):
     
 def split_contigs(headers, input_dir, output_dir):
     
-    """Most annotations are incomplete and consist of multiple contigs. Panaroo only accepts single genomic regions. Similarly, CDSs not starting in ATG are not accepted."""
+    """Most annotations are incomplete and consist of multiple contigs. Panaroo only accepts prokka-formatted genomic regions. Similarly, CDSs not starting in ATG are not accepted."""
+    all_gene_ids = []
+    source = []
+    type = []
+    phase = []
+    attributes = []
+    
     for header in tqdm(headers):
         d = {"[": "", "]": "", " ": "", "'": ""}
         header = replace_all(header, d)
@@ -117,12 +124,16 @@ def split_contigs(headers, input_dir, output_dir):
         
         with gzip.open(gff, 'rt') as g:
             stored_gff = str(g.read())
-
+        
         stored_fasta = stored_fasta.split('>')
         stored_fasta = stored_fasta[1:]
         
         stored_gff = stored_gff.split("##sequence-region ")
         stored_gff = stored_gff[1:]
+        
+        all_region_names = []
+        all_region_annotations = []
+        all_region_sequences = []
         
         for gff_region in range(len(stored_gff)):
 
@@ -130,8 +141,7 @@ def split_contigs(headers, input_dir, output_dir):
             stored_gff[gff_region] = replace_all(stored_gff[gff_region], d) #Ensure GFF annotation format is consistent with prokka output
               
             gene_list = stored_gff[gff_region].splitlines()
-
-            title = gene_list[0].split(" ")[0]
+            title = gene_list[0].split("\n")[0]
             for line in range(len(gene_list)):
               if '###' in gene_list[line]:
                   gene_list = gene_list[:line]
@@ -181,16 +191,35 @@ def split_contigs(headers, input_dir, output_dir):
                     
             if len(output_cds) == 0:
               continue
-
+    
+            all_region_names.append("##sequence-region " + title)
+                        
             cleaned_gffs = "\n".join(str(z) for z in output_cds)
-            cleaned_gffs = title + '\n' + cleaned_gffs
+            
+            for annotation_line in range(len(output_cds)):
+                tab_splitted = output_cds[annotation_line].split('\t')
+                source.append(tab_splitted[1])
+                type.append(tab_splitted[2])
+                phase.append(tab_splitted[7])
+                attributes.append(tab_splitted[8])
+                all_gene_ids.append(re.search('ID=(.*?);', tab_splitted[8]).group(1))
+                
+            all_region_annotations.append(cleaned_gffs)
             #Concatenate downloaded fasta and reformatted GFF
-            fasta_file = stored_fasta[gff_region]
-            cleaned_gffs = cleaned_gffs + '\n' + '##FASTA' + '\n' + ">" + fasta_file
-            filename_cleaned = output_dir + title + '.gff'
-            outfile = open(filename_cleaned,'w')
-            outfile.write("##sequence-region " + cleaned_gffs)
-            outfile.close()
+            fasta_file = ">" + stored_fasta[gff_region]
+            all_region_sequences.append(fasta_file)
+            
+        annotated_file = "\n".join(all_region_names + all_region_annotations) + "\n##FASTA\n" + "".join(all_region_sequences)
+        filename_cleaned = output_dir + header + '.gff'
+        outfile = open(filename_cleaned,'w')
+        outfile.write(annotated_file)
+        outfile.close()
+    
+    all_files_annotations = pd.DataFrame({'ID': all_gene_ids, 'source':source,'type':type, 'phase': phase, 'attributes': attributes})
+    
+    all_files_annotations.to_csv(output_dir + "/"+ "all_annotations.csv", index=False)
+
+
     return
 
 def main():
@@ -217,7 +246,7 @@ def main():
                                     temp_dir)
     elif isinstance(accessions, list):
         headers = []
-        for accession in accessions:
+        for accession in tqdm(accessions):
             headers.append(str(genome_downloader(args.email,
                                                  accession,
                                                  int(args.number),
