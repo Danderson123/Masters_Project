@@ -61,14 +61,14 @@ def translate(seq): #Translate the exon sequence of the gene into its respective
 def get_forward_annotations(title, sequence, locus_number):
         
     start1 = r"ATG"
-    #start2 = r"TTG"
-    #start3 = r"GTG"
+    start2 = r"TTG"
+    start3 = r"GTG"
 
     stop1 = r"TAG"
     stop2 = r"TAA"
     stop3 = r"TGA"
 
-    forwardstartList = [start1]#, start2, start3]
+    forwardstartList = [start1, start2, start3]
     start_indexes_forward = []
 
     for start_regex in forwardstartList:
@@ -94,7 +94,6 @@ def get_forward_annotations(title, sequence, locus_number):
     stop_array = np.array(stop_indexes_forward)
 
     distances = np.subtract(stop_array,start_array[:,None])
-    #medial = np.where(((distances < 0) | (distances == 0)), 2, distances)
     distances1 = distances +1
     middle = np.where(distances1 <= 1, 2, distances1)
 
@@ -116,7 +115,7 @@ def get_forward_annotations(title, sequence, locus_number):
     for x in itemindex['index'].index:
         start_codon = start_indexes_forward[x]
         stop_codon = stop_indexes_forward[itemindex['index'][x]]
-        if not start_codon > stop_codon and stop_codon - start_codon >100:
+        if not start_codon > stop_codon and stop_codon - start_codon >50:
             annotation = title
             annotation += "\tCRUDE\tCDS\t"
             annotation += str(start_codon + 1)
@@ -143,14 +142,14 @@ def get_reverse_annotations(title, sequence, locus_number):
     sequence = reverse_complement(sequence)
     
     start1 = r"ATG"
-    #start2 = r"TTG"
-    #start3 = r"GTG"
+    start2 = r"TTG"
+    start3 = r"GTG"
     
     stop1 = r"TAG"
     stop2 = r"TAA"
     stop3 = r"TGA"
     
-    forwardstartList = [start1]#, start2, start3]
+    forwardstartList = [start1, start2, start3]
     start_indexes_forward = []
 
     for start_regex in forwardstartList:
@@ -198,7 +197,7 @@ def get_reverse_annotations(title, sequence, locus_number):
     for x in itemindex['index'].index:
         start_codon = seq_length - int(start_indexes_forward[x])
         stop_codon = seq_length - int(stop_indexes_forward[itemindex['index'][x]])
-        if not start_codon < stop_codon and start_codon - stop_codon >100:
+        if not start_codon < stop_codon and start_codon - stop_codon >50:
             annotation = title
             annotation += "\tCRUDE\tCDS\t"
             annotation += str(stop_codon)
@@ -262,7 +261,7 @@ def generate_annotations(fnas):
             annotation_all_regions += annotations
         
         print(header + " annotations complete")
-        #gff_file = "\n".join(region_titles + annotation_all_regions + sequences_all_regions)
+
         gff_file = "\n".join(list(region_titles) + list(annotation_all_regions) + list(sequences_all_regions))
         
         total_genes += annotation_all_regions
@@ -270,7 +269,7 @@ def generate_annotations(fnas):
         
         print("writing file")
 
-        outfile_gff = open("crudely_annotated/" + outfile_name + ".gff", "w")
+        outfile_gff = open("PAnnotate/crudely_annotated_100/" + outfile_name + ".gff", "w")
         outfile_gff.write(gff_file)
         outfile_gff.close()
         
@@ -282,132 +281,12 @@ def generate_annotations(fnas):
 if __name__ == '__main__':
 
     start_time = time.time()
-    fnas = glob.glob("crudely_annotated/*.fna")
+    fnas = glob.glob("PAnnotate/Results1/fasta_files/*.fna")
     chunks = [fnas[i::6] for i in range(6)]
     pool = Pool(processes=6)
     total = pool.map(generate_annotations, chunks)
     end_time = time.time()
     print(str(end_time - start_time) + " seconds" )
     print(str(total))
- 
     
-# =============================================================================
-# def split_contigs(headers, output_dir):
-# 
-#     import pandas as pd
-#     """Most annotations are incomplete and consist of multiple contigs. Panaroo only accepts prokka-formatted genomic regions. Similarly, CDSs not starting in ATG are not accepted."""
-#     all_gene_ids = []
-#     source = []
-#     type = []
-#     phase = []
-#     attributes = []
-# 
-#     for header in tqdm(headers):
-#         with open(header, 'rt') as f:
-#             stored_fasta = str(f.read())
-#         
-#         import os
-#         gff_in_name = header.split(".fna")[0]
-#         
-#         with open(gff_in_name + ".gff", 'rt') as g:
-#             stored_gff = str(g.read())
-#         
-#         stored_fasta = stored_fasta.split('>')
-#         stored_fasta = stored_fasta[1:]
-#         
-#         stored_gff = stored_gff.split("##sequence-region ")
-#         stored_gff = stored_gff[1:]
-#         
-#         all_region_names = []
-#         all_region_annotations = []
-#         all_region_sequences = []
-#         
-#         for gff_region in range(len(stored_gff)):
-# 
-#             gene_list = stored_gff[gff_region].splitlines()
-#             title = gene_list[0].split("\n")[0]
-#             for line in range(len(gene_list)):
-#               if '###' in gene_list[line]:
-#                   gene_list = gene_list[:line]
-# 
-#             gene_list = gene_list[2:]
-#             
-#             genes = []
-#             for y in range(len(gene_list)):
-#               split = re.split(r'\t+', gene_list[y])
-#               end = int(split[4])
-#               start = int(split[3])
-#               if split[2] == 'CDS' and (((end - start) + 1) % 3) == 0 and ((end - start) + 1) >= 100: #process_pokka input only looks for CDSs and returns duplicate error when the exon is split.
-#                 genes.append(gene_list[y])
-#               else:
-#                 pass
-#             
-#             Ids= []
-#             for gene in range(len(genes)):
-#               Id = re.search('ID=(.*?);', genes[gene]).group(1)
-#               Ids.append(Id)
-#             
-#             output_cds = []
-#             start_index = []
-#             end_index = []
-#             sense = []
-#             for Id in range(len(Ids)):
-#               if Ids.count(Ids[Id]) == 1:
-#                   output_cds.append(genes[Id])
-#                   no_duplicates_split = re.split(r'\t+', genes[Id])
-#                   start_index.append(int(no_duplicates_split[3]) - 1)
-#                   end_index.append(int(no_duplicates_split[4]) - 1)
-#                   sense.append(no_duplicates_split[6])
-#             
-#             nucleotides = ''.join(stored_fasta[gff_region].split('\n')[1:])
-#             
-#             to_remove = []
-#             for sign in range(len(sense)):
-#                 if sense[sign] == '+':
-#                     if not nucleotides[start_index[sign]: start_index[sign] + 3] == "ATG":
-#                         to_remove.append(sign)
-#                 else:
-#                     if not nucleotides[end_index[sign] - 2: end_index[sign] + 1] == "CAT":
-#                         to_remove.append(sign)
-#             
-#             for index in sorted(to_remove, reverse=True):
-#                 del output_cds[index]
-#                     
-#             if len(output_cds) == 0:
-#               continue
-# 
-#             all_region_names.append("##sequence-region " + title)
-#                         
-#             cleaned_gffs = "\n".join(str(z) for z in output_cds)
-#             
-#             for annotation_line in range(len(output_cds)):
-#                 tab_splitted = output_cds[annotation_line].split('\t')
-#                 source.append(tab_splitted[1])
-#                 type.append(tab_splitted[2])
-#                 phase.append(tab_splitted[7])
-#                 attributes.append(tab_splitted[8])
-#                 all_gene_ids.append(re.search('ID=(.*?);', tab_splitted[8]).group(1))
-#                 
-#             all_region_annotations.append(cleaned_gffs)
-#             #Concatenate downloaded fasta and reformatted GFF
-#             fasta_file = ">" + stored_fasta[gff_region]
-#             all_region_sequences.append(fasta_file)
-#             
-#         annotated_file = "\n".join(all_region_names + all_region_annotations) + "\n##FASTA\n" + "".join(all_region_sequences)
-#         gff_in_name = gff_in_name.split("/")[1]
-#         filename_cleaned = "crudely_annotated_cleaned/" + gff_in_name + '.gff'
-#         outfile = open(filename_cleaned,'w')
-#         outfile.write(annotated_file)
-#         outfile.close()
-# 
-#     all_files_annotations = pd.DataFrame({'ID': all_gene_ids, 'source':source,'type':type, 'phase': phase, 'attributes': attributes})
-# 
-#     all_files_annotations.to_csv('crudely_annotated_cleaned' + "/"+ "all_annotations.csv", index=False)
-# 
-# 
-#     return
-# 
-# crude_files = glob.glob("crudely_annotated/*.fna")
-# 
-# split_contigs(crude_files, "")
-# =============================================================================
+
