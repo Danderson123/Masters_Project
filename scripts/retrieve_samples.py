@@ -10,7 +10,7 @@ import os
 import urllib.request
 from tqdm import tqdm
 
-with open("data/biosample_result.txt", "r") as s:
+with open("biosample_result.txt", "r") as s:
     sample_accessions = s.read()
 
 sample_list = sample_accessions.split("\n")
@@ -42,9 +42,14 @@ for item in tqdm(range(len(cleaned))):
             label = os.path.basename(url)
             #get the fasta link - change this to get other formats
             fasta_link = os.path.join(url,label+'_genomic.fna.gz')
+            gff_link = os.path.join(url,label+'_genomic.gff.gz')
+            
+            gff_file = '{}.gff.gz'.format(label)
             fasta_file = '{}.fna.gz'.format(label)
             
+            urllib.request.urlretrieve(gff_link, gff_file)
             urllib.request.urlretrieve(fasta_link, fasta_file)
     except:
+        
         print(cleaned[item])
         continue
