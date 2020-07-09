@@ -2,6 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 This script downloads fasta and gff files in fasta format for accessions of interest. These are then joined and cleaned for direct input into panaroo.
+
+
+- need to add support for CTG and GTG
+- need to remove ab initio predictions
 """
 import time
 import os
@@ -15,7 +19,48 @@ from tqdm import tqdm
 import gzip
 import pandas as pd
 
-from .integrate import replace_all
+def translate(seq): #Translate the exon sequence of the gene into its respective amino acid codes using a dictionary
+    table = {
+        'ATA':'I', 'ATC':'I', 'ATT':'I', 'ATG':'M',
+        'ACA':'T', 'ACC':'T', 'ACG':'T', 'ACT':'T',
+        'AAC':'N', 'AAT':'N', 'AAA':'K', 'AAG':'K',
+        'AGC':'S', 'AGT':'S', 'AGA':'R', 'AGG':'R',
+        'CTA':'L', 'CTC':'L', 'CTG':'L', 'CTT':'L',
+        'CCA':'P', 'CCC':'P', 'CCG':'P', 'CCT':'P',
+        'CAC':'H', 'CAT':'H', 'CAA':'Q', 'CAG':'Q',
+        'CGA':'R', 'CGC':'R', 'CGG':'R', 'CGT':'R',
+        'GTA':'V', 'GTC':'V', 'GTG':'V', 'GTT':'V',
+        'GCA':'A', 'GCC':'A', 'GCG':'A', 'GCT':'A',
+        'GAC':'D', 'GAT':'D', 'GAA':'E', 'GAG':'E',
+        'GGA':'G', 'GGC':'G', 'GGG':'G', 'GGT':'G',
+        'TCA':'S', 'TCC':'S', 'TCG':'S', 'TCT':'S',
+        'TTC':'F', 'TTT':'F', 'TTA':'L', 'TTG':'L',
+        'TAC':'Y', 'TAT':'Y', 'TAA':'*', 'TAG':'*',
+        'TGC':'C', 'TGT':'C', 'TGA':'*', 'TGG':'W',
+    }
+    protein =""
+    try:
+        if len(seq)%3 == 0:
+            for i in range(0, len(seq), 3):
+                codon = seq[i:i + 3] #Defining a codon as 3 bases
+                protein+= table[codon] #Translate the codon into an amino acid based on the dictionary and append this to the protein sequence
+    except:
+        protein = ""
+    return protein
+
+def reverse_complement(dna):
+    try:
+        complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N'}
+        reversed = ''.join([complement[base] for base in dna[::-1]])
+    except:
+        reversed = ""
+    return reversed
+
+
+def replace_all(text, dic):
+    for i, j in dic.items():
+        text = text.replace(i, j)
+    return text
 
 def get_options(): #options for downloading and cleaning
     
@@ -100,7 +145,7 @@ def genome_downloader(email, accession, number, output_dir):
         
         urllib.request.urlretrieve(gff_link, gff_file)
         urllib.request.urlretrieve(fasta_link, fasta_file)
-
+        
     os.chdir('../../..')
     return files
     
@@ -154,7 +199,10 @@ def split_contigs(headers, input_dir, output_dir):
               end = int(split[4])
               start = int(split[3])
               if split[2] == 'CDS' and (((end - start) + 1) % 3) == 0: #process_pokka input only looks for CDSs and returns duplicate error when the exon is split.
-                  genes.append(gene_list[y])
+                  if not "prediction" in split[8]:
+                      genes.append(gene_list[y])
+                  else:
+                      pass
               else:
                   pass
 
@@ -176,14 +224,18 @@ def split_contigs(headers, input_dir, output_dir):
                   sense.append(no_duplicates_split[6])
             
             nucleotides = ''.join(stored_fasta[gff_region].split('\n')[1:])
-            
+
             to_remove = []
             for sign in range(len(sense)):
                 if sense[sign] == '+':
-                    if not nucleotides[start_index[sign]: start_index[sign] + 3] == "ATG":
+                    start_codon = nucleotides[start_index[sign]: start_index[sign] + 3]
+                    protein = translate(nucleotides[start_index[sign]: end_index[sign] - 2])
+                    if not (start_codon == "ATG" or start_codon == "CTG" or start_codon == "GTG") or "*" in protein or protein == "":
                         to_remove.append(sign)
-                else:                     
-                    if not nucleotides[end_index[sign] - 2: end_index[sign] + 1] == "CAT":
+                else:
+                    reverse_start_codon = nucleotides[end_index[sign] - 2: end_index[sign] + 1]
+                    protein_reverse = translate(reverse_complement(nucleotides[start_index[sign] + 3: end_index[sign] + 1]))
+                    if not (reverse_start_codon == "CAT" or reverse_start_codon == "CAG" or reverse_start_codon == "CAC") or "*" in protein_reverse or protein_reverse == "":
                         to_remove.append(sign)
             
             for index in sorted(to_remove, reverse=True):
@@ -237,6 +289,7 @@ def main():
     accessions = args.accessions.replace('"', "")
     if "," in accessions:
         accessions = args.accessions.split(',')
+   
     print("Retrieving Sequences")
     
     if isinstance(accessions, str):
@@ -247,10 +300,13 @@ def main():
     elif isinstance(accessions, list):
         headers = []
         for accession in tqdm(accessions):
-            headers.append(str(genome_downloader(args.email,
-                                                 accession,
-                                                 int(args.number),
-                                                 temp_dir)))
+            try:
+                headers.append(str(genome_downloader(args.email,
+                                                     accession,
+                                                     int(args.number),
+                                                     temp_dir)))
+            except: 
+                print(accession)
     else:
         raise RuntimeError("Accessions are invalid")
         
