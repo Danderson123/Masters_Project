@@ -8,31 +8,22 @@ import glob
 from tqdm import tqdm
 import time
 
+title = glob.glob("result3_to_annotate/*.fna")
+
 start = time.time()
-
-title = glob.glob("Results1/*.fna")
-
 for x in tqdm(range(len(title))):
-     command = "prokka --outdir Results1/PROKKA_annotated" + title[x] + " --genus Streptococcus --species pneumoniae --cpus 0 --quiet --norrna --notrna " + title[x]
+     command = "prokka --outdir Results3_PROKKA_annotated_" + title[x] + " --cpus 1  --norrna --notrna " + title[x]
      subprocess.run(command, shell = True)
-
 end = time.time()
-print(str(end - start) + " seconds")
+print("Prokka: " + str(end - start) + " seconds")
 
-gffs = glob.glob("prokka_gffs/*.gff")
+#start = time.time()
 
-all_annotations = []
+#for x in tqdm(range(len(title))):
+ #   out = title[x].split(".fna")[0] + ".gff"
+  #  command = "prodigal -f gff -i " + title[x] + " -o " + out
+   # subprocess.run(command, shell = True)
 
-for file in gffs:
-    with open(file, 'r') as f:
-        infile = f.read()
-    annotations = infile.splitlines()
-    index = 0
-    for line in range(len(annotations)):
-        if "##sequence-region" in annotations[line] or "##gff-version 3" in annotations[line]:
-            index += 1
-    cleaned = "\n".join(annotations[index:])
-    fasta_split = cleaned.split("##FASTA")[0].splitlines()
-    all_annotations += fasta_split
-    
-print(len(all_annotations))
+#end = time.time()
+#print("Prodigal: " + str(end - start) + " seconds")
+
