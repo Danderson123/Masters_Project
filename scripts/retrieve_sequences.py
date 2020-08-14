@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-This script downloads fasta and gff files for accessions of interest. These are then joined and cleaned for direct input into panaroo.
-- Need to remove hypothetical proteins. 
+This script downloads fasta and gff files in fasta format for accessions of interest. These are then joined and cleaned for direct input into panaroo.
+
+
+- need to add support for CTG and GTG
+- need to remove ab initio predictions
 """
 import time
 import os
@@ -65,7 +68,7 @@ def get_options(): #options for downloading and cleaning
 
     description = 'Download and process assemblies for panaroo input'
     parser = argparse.ArgumentParser(description=description,
-                                     prog='panaroo-retrieve')
+                                     prog='retrieve')
 
     io_opts = parser.add_argument_group('Entrez')
     
@@ -123,7 +126,7 @@ def genome_downloader(email, accession, number, output_dir):
     outfile.write('\n'.join(assembly_ids))
     outfile.close()
     
-    for assembly_id in assembly_ids:#tqdm(assembly_ids):
+    for assembly_id in assembly_ids:
         esummary_handle = Entrez.esummary(db="assembly", id=assembly_id, report="full")
         esummary_record = Entrez.read(esummary_handle, validate = False)
 
@@ -154,6 +157,16 @@ def split_contigs(headers, input_dir, output_dir):
     type = []
     phase = []
     attributes = []
+    all_sequences = []
+    strand = []
+    isolates = []
+    
+    all_raw = []
+    non_cds = []
+    non_divis = []
+    duplicates = []
+    not_start = []
+    stop_in =[]
     
     for header in tqdm(headers):
         d = {"[": "", "]": "", " ": "", "'": ""}
@@ -161,9 +174,14 @@ def split_contigs(headers, input_dir, output_dir):
         fasta = input_dir + header + '.fna.gz'
         gff = input_dir + header + '.gff.gz'
         
+        fasta = input_dir + header + '.fna.gz'
         with gzip.open(fasta, 'rt') as f:
             stored_fasta = str(f.read())
-        
+       
+            #fasta = input_dir + header + '.fna'
+            #with open(fasta, 'rt') as f:
+               # stored_fasta = str(f.read())
+                
         with gzip.open(gff, 'rt') as g:
             stored_gff = str(g.read())
         
@@ -192,33 +210,35 @@ def split_contigs(headers, input_dir, output_dir):
 
             genes = []
             for y in range(len(gene_list)):
-              split = re.split(r'\t+', gene_list[y])
-              end = int(split[4])
-              start = int(split[3])
-              if split[2] == 'CDS' and (((end - start) + 1) % 3) == 0: #process_pokka input only looks for CDSs and returns duplicate error when the exon is split.
-                  if not "prediction" in split[8]:
-                      genes.append(gene_list[y])
-                  else:
-                      pass
-              else:
-                  pass
-
+                all_raw.append(gene_list[y])
+                split = re.split(r'\t+', gene_list[y])
+                end = int(split[4])
+                start = int(split[3])
+                if split[2] == 'CDS' and (((end - start) + 1) % 3) == 0: #process_pokka input only looks for CDSs and returns duplicate error when the exon is split.
+                    genes.append(gene_list[y])
+                elif not split[2] == 'CDS':
+                    non_cds.append(gene_list[y])
+                elif split[2] == 'CDS' and not (((end - start) + 1) % 3) == 0:
+                    non_divis.append(gene_list[y])
+            
             Ids= []
             for gene in range(len(genes)):
-              Id = re.search('ID=(.*?);', genes[gene]).group(1)
-              Ids.append(Id)
+                Id = re.search('ID=(.*?);', genes[gene]).group(1)
+                Ids.append(Id)
 
             output_cds = []
             start_index = []
             end_index = []
             sense = []
             for Id in range(len(Ids)):
-              if Ids.count(Ids[Id]) == 1:
+                if Ids.count(Ids[Id]) == 1:
                   output_cds.append(genes[Id])
                   no_duplicates_split = re.split(r'\t+', genes[Id])
                   start_index.append(int(no_duplicates_split[3]) - 1)
                   end_index.append(int(no_duplicates_split[4]) - 1)
                   sense.append(no_duplicates_split[6])
+                else:
+                    duplicates.append(Ids[Id])
             
             nucleotides = ''.join(stored_fasta[gff_region].split('\n')[1:])
 
@@ -227,13 +247,21 @@ def split_contigs(headers, input_dir, output_dir):
                 if sense[sign] == '+':
                     start_codon = nucleotides[start_index[sign]: start_index[sign] + 3]
                     protein = translate(nucleotides[start_index[sign]: end_index[sign] - 2])
-                    if not (start_codon == "ATG" or start_codon == "CTG" or start_codon == "GTG") or "*" in protein or protein == "":
+                    if not (start_codon == "ATG" or start_codon == "TTG" or start_codon == "GTG") or "*" in protein or protein == "":
                         to_remove.append(sign)
+                        if not (start_codon == "ATG" or start_codon == "TTG" or start_codon == "GTG"):
+                            not_start.append(start_codon)
+                        if "*" in protein:
+                            stop_in.append(protein)
                 else:
                     reverse_start_codon = nucleotides[end_index[sign] - 2: end_index[sign] + 1]
                     protein_reverse = translate(reverse_complement(nucleotides[start_index[sign] + 3: end_index[sign] + 1]))
-                    if not (reverse_start_codon == "CAT" or reverse_start_codon == "CAG" or reverse_start_codon == "CAC") or "*" in protein_reverse or protein_reverse == "":
+                    if not (reverse_start_codon == "CAT" or reverse_start_codon == "CAA" or reverse_start_codon == "CAC") or "*" in protein_reverse or protein_reverse == "":
                         to_remove.append(sign)
+                        if not (reverse_start_codon == "CAT" or reverse_start_codon == "CAA" or reverse_start_codon == "CAC"):
+                            not_start.append(start_codon)
+                        if "*" in protein_reverse:
+                            stop_in.append(protein_reverse)
             
             for index in sorted(to_remove, reverse=True):
                 del output_cds[index]
@@ -252,6 +280,13 @@ def split_contigs(headers, input_dir, output_dir):
                 phase.append(tab_splitted[7])
                 attributes.append(tab_splitted[8])
                 all_gene_ids.append(re.search('ID=(.*?);', tab_splitted[8]).group(1))
+                strand.append(tab_splitted[6])
+                isolates.append(header)
+                annotation_seq = nucleotides[int(tab_splitted[3]) - 1: int(tab_splitted[4]) - 3]
+                if tab_splitted[6] == "+":
+                    all_sequences.append(annotation_seq)
+                elif tab_splitted[6] == "-":
+                    all_sequences.append(reverse_complement(annotation_seq))
                 
             all_region_annotations.append(cleaned_gffs)
             #Concatenate downloaded fasta and reformatted GFF
@@ -263,12 +298,19 @@ def split_contigs(headers, input_dir, output_dir):
         outfile = open(filename_cleaned,'w')
         outfile.write(annotated_file)
         outfile.close()
-    
-    all_files_annotations = pd.DataFrame({'ID': all_gene_ids, 'source':source,'type':type, 'phase': phase, 'attributes': attributes})
-    
-    all_files_annotations.to_csv(output_dir + "/"+ "all_annotations.csv", index=False)
 
-
+    all_files_annotations = pd.DataFrame({"Isolate": isolates, 'ID': all_gene_ids, 'source':source,'type':type, 'strand' : strand, 'phase': phase, 'attributes': attributes, 'sequence': all_sequences})
+    
+    all_files_annotations.to_csv(output_dir + "all_annotations.csv", index=False)
+    
+    print("raw annotations:" + str(len(all_raw)))
+    print("Non-CDS:" + str(len(non_cds)))
+    print("Non-divisible:" + str(len(non_divis)))
+    print("duplicates:" + str(len(duplicates)))
+    print("not_start:" + str(len(not_start)))
+    print("stop_in:" + str(len(stop_in)))
+    print("all_valid:" + str(len(all_gene_ids)))
+    
     return
 
 def main():
@@ -286,9 +328,11 @@ def main():
     accessions = args.accessions.replace('"', "")
     if "," in accessions:
         accessions = args.accessions.split(',')
-   
-    print("Retrieving Sequences")
     
+    failed = []
+    
+    print("Retrieving Sequences")
+
     if isinstance(accessions, str):
         headers = genome_downloader(args.email,
                                     [accessions],
@@ -302,14 +346,19 @@ def main():
                                                      accession,
                                                      int(args.number),
                                                      temp_dir)))
-            except: 
-                print(accession)
+            except:
+                failed.append(accession)
     else:
         raise RuntimeError("Accessions are invalid")
         
+    
+    failed_out = open(temp_dir + "failed_accessions.txt", "w")
+    failed_out.write(",".join(failed))
+    failed_out.close()
+    
     print(('found {} ids').format(len(headers)))
     print("Processing GFF files")
-
+    
     split_contigs(headers,
                   temp_dir + 'raw_files/',
                   args.output_dir)
@@ -325,5 +374,4 @@ def main():
     sys.exit(0)
 
 if __name__ == '__main__':
-    
     main()
