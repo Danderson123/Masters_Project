@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Aug  8 11:30:59 2020
-
-@author: danielanderson
+Search for AMR/virulent genes in two graphs and compare their frequencies
 """
 
 
