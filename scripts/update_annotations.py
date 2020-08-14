@@ -1,19 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Read through graph, 
-find genes with 'reforund',
-extract the corresponding isolate and gene name, 
-search for the gene name in the alignments, 
-extract the isolate's sequence,
-open isolate GFF and organise as dataframe,
-add refound to the end of the dataframe,
-reorganise by the start and end,
-write output'
-
-going to have refound dictionary generation out of loop and then search for each isolate indepepndently to speed up computation time  
-
-SORT OUT THE REVERSE SEAQRCHING. THE POSITON IS ALWAYS RELATIVE TO THE SENSE
+if multiple names then add synonymn
 """
 import networkx as nx
 import time 
@@ -67,7 +55,7 @@ def get_options(): #options for downloading and cleaning
     return (args)
 
 def reverse_complement(dna):
-    complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N'}
+    complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N', 'R': 'R', 'K':'K', 'Y':'Y'}
     return ''.join([complement[base] for base in dna[::-1]])
 
 def position_finder(sequence, fasta_information_forward, fasta_information_reverse):
@@ -88,41 +76,41 @@ def position_finder(sequence, fasta_information_forward, fasta_information_rever
     return start_position, end_position, strand
 
 def gff_row(start, end, strand, ID, name, sequence_region):
-    gff_line = sequence_region + '\t' + 'Panaroo' + '\t' + 'CDS' + '\t' + str(start) + '\t' + str(end) + '\t' + '.' + '\t' + str(strand) + '\t' + '.' + '\t' + ID + ';' + 'Name=' + name + ';' + 'gbkey=Gene' + ';' + 'gene_biotype=protein_coding' #+ ';' + 'locus_tag='
+    gff_line = sequence_region + '\t' + 'Panaroo' + '\t' + 'CDS' + '\t' + str(start) + '\t' + str(end) + '\t' + '.' + '\t' + str(strand) + '\t' + '.' + '\t' + ID + ';' + 'Name=' + name + ';' + 'gbkey=CDS' + ';' + 'gene=' + name + ';' + 'gene_biotype=protein_coding' #+ ';' + 'locus_tag='
     return gff_line
     
 def generate_library(graph_path, alignement_path):
     
     G = nx.read_gml(graph_path + "final_graph.gml")
-    
-    single_hypotheticals = []
-    for node in tqdm(G._node):
-        y = G._node[node]
-        if y["description"] == 'hypothetical protein':
-            if isinstance(y["seqIDs"], str):
-                single_hypotheticals.append(node)
-    G.remove_nodes_from(single_hypotheticals)
 
     refound_genes = []    
     for node in G._node:
         y = G._node[node]
         if 'refound' in y["geneIDs"]:
             refound_genes.append(y["name"])
+        elif "~" in y["name"]:
+            refound_genes.append(y["name"])
+        elif "group" in y["name"]:
+            refound_genes.append(y["name"])
     
     library = {}
     for refound_gene in tqdm(range(len(refound_genes))):
-        with open(alignement_path + refound_genes[refound_gene] + '.aln.fas') as file:
-            gene = (file.read().replace("-","")).split(">")[1:]
-            isolates = []
-            cluster = []
-            sequence = []
-            for x in range(len(gene)):
-                isolate_split = gene[x].split(";")
-                isolates.append(isolate_split[0])
-                cluster_split = isolate_split[1].split("\n")
-                cluster.append(cluster_split[0])
-                sequence.append(''.join(cluster_split[1:]))
-            dictionary = {"Isolates" : isolates, "clusters": cluster, "Sequences" : sequence}
+        try:
+            with open(alignement_path + refound_genes[refound_gene] + '.aln.fas') as file:
+                gene = (file.read().replace("-","")).split(">")[1:]
+        except:
+            with open(alignement_path + refound_genes[refound_gene] + '.fasta') as file:
+                gene = (file.read().replace("-","")).split(">")[1:]
+        isolates = []
+        cluster = []
+        sequence = []
+        for x in range(len(gene)):
+            isolate_split = gene[x].split(";")
+            isolates.append(isolate_split[0])
+            cluster_split = isolate_split[1].split("\n")
+            cluster.append(cluster_split[0])
+            sequence.append(''.join(cluster_split[1:]))
+        dictionary = {"Isolates" : isolates, "clusters": cluster, "Sequences" : sequence}
         library[refound_genes[refound_gene]] = dictionary
     
     return library, G
@@ -134,7 +122,7 @@ def update_gff(isolate, input_gffs, library, output_dir):
     
     for key, value in library.items():
         for x in range(len(value['Isolates'])):
-            if value['Isolates'][x] == isolate and "refound" in value['clusters'][x]:
+            if value['Isolates'][x] == isolate: #and "refound" in value['clusters'][x]:
                 isolate_genes.append(key)
                 isolate_gene_sequence.append(value['Sequences'][x])
     
@@ -149,18 +137,29 @@ def update_gff(isolate, input_gffs, library, output_dir):
     titles = []
     for line in range(len(lines)):
         if "##sequence-region" in lines[line]:
-                titles.append(lines[line])
-                end_title_line = line
-    
-    annotations = lines[end_title_line + 1:]
+            titles.append(lines[line])
+            end_title_line = line
 
+    annotations = lines[end_title_line + 1:]
+        
+    annotation_region = []
     annotation_indexes = []
     for annotation in range(len(annotations) - 1):
         if not (annotations[annotation].split("\t")[0]) == (annotations[annotation + 1].split("\t")[0]):
+            annotation_region.append(annotations[annotation].split("\t")[0])
             annotation_indexes.append(annotation)
     
     annotation_indexes.append(len(annotations) - 1)
     annotations_split = []
+    
+    region_to_remove = []
+    for region_title in range(len(titles)):
+        if not titles[region_title].split(" ")[1] in annotation_region:
+            region_to_remove.append(region_title)
+    
+    for index in sorted(region_to_remove, reverse=True):
+        del titles[index]
+
     start_index = 0
     for index in range(len(annotation_indexes)):
         end = annotation_indexes[index] + 1
@@ -169,7 +168,7 @@ def update_gff(isolate, input_gffs, library, output_dir):
         annotations_split.append(annotations[item])
     
     contigs = []
-    for title in range(len(titles)):
+    for title in tqdm(range(len(titles))):
         fasta_information_forward = "".join(split_fasta[title].split('\n')[1:])
         fasta_information_reverse = reverse_complement(fasta_information_forward)
         gff_information = annotations_split[title]
@@ -199,8 +198,23 @@ def update_gff(isolate, input_gffs, library, output_dir):
             else:
                 pass
         
-        gff_information = "\n".join(sorted(gff_information, key=lambda x: x.split('\t')[3]))
-        contigs.append(titles[title] + "\n" + gff_information)
+        gff_information = sorted(gff_information, key=lambda x: int(x.split('\t')[3]))
+        
+        positions_out = []
+        for line in gff_information:
+            positions_out.append((str(line.split('\t')[3]) + "," + str(line.split('\t')[4])))
+            
+        to_remove = []
+        for pos in range(len(positions_out)):
+            if positions_out.count(positions_out[pos]) > 1 and not "Panaroo" in gff_information[pos]:
+                to_remove.append(pos)
+        
+        for index in sorted(to_remove, reverse=True):
+            del gff_information[index]
+            
+        gff_information = "\n".join(gff_information)
+        contigs.append(titles[title] + "\n" + gff_information + "\n##FASTA" + "".join(split[1:]))
+        
     with open(output_dir + '/' + filename, 'w') as f:
         for item in contigs:
             f.write("%s\n" % item)
@@ -263,11 +277,10 @@ def main():
 
     for isolate in tqdm(isolate_files):
         isolate = os.path.basename(isolate).split('.gff')[0]
-        try:
-            update_gff(isolate, args.gff_dir, library, args.output_dir)
-        except:
-            print("Error with {}.gff".format(isolate))
-            pass
+        update_gff(isolate, args.gff_dir, library, args.output_dir)
+        #except:
+           # print("Error with {}.gff".format(isolate))
+            #pass
      
     print("Calculating gene frequencies...")
     
@@ -277,3 +290,5 @@ def main():
     print(end - start)
     
     sys.exit(0)
+
+main()
