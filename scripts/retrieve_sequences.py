@@ -2,10 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 This script downloads fasta and gff files in fasta format for accessions of interest. These are then joined and cleaned for direct input into panaroo.
-
-
-- need to add support for CTG and GTG
-- need to remove ab initio predictions
 """
 import time
 import os
