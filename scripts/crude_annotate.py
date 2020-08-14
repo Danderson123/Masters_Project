@@ -58,146 +58,193 @@ def translate(seq): #Translate the exon sequence of the gene into its respective
             protein+= table[codon] #Translate the codon into an amino acid based on the dictionary and append this to the protein sequence
     return protein
 
-def get_forward_annotations(title, sequence, locus_number):
-        
+def get_annotations(title, sequence):
+
     start1 = r"ATG"
     start2 = r"TTG"
     start3 = r"GTG"
-
+    
+    start4 = r"CAT"
+    start5 = r"CAA"
+    start6 = r"CAC"
+    
     stop1 = r"TAG"
     stop2 = r"TAA"
     stop3 = r"TGA"
-
-    forwardstartList = [start1, start2, start3]
-    start_indexes_forward = []
-
-    for start_regex in forwardstartList:
+    
+    stop4 = r"CTA"
+    stop5 = r"TTA"
+    stop6 = r"TCA"
+    
+    startList = [start1, start2, start3, stop4, stop5, stop6]
+    start_indexes= []
+    start_strand = []
+    
+    print("Identifying start and stop codons...")
+    for start_regex in startList:
         if re.search(start_regex, sequence):
             stop_codon_list = re.finditer(start_regex,sequence)
             for y in stop_codon_list:
-                start_indexes_forward.append(y.start())
+                start_indexes.append(y.start())
+                if start_regex == "ATG" or start_regex == "TTG" or start_regex == "GTG":
+                    start_strand.append("+")
+                else:
+                    start_strand.append("-")
 
-    stop_indexes_forward = []
+    stopList = [stop1, stop2, stop3, start4, start5, start6]
+    stop_indexes = []
+    stop_strand = []
 
-    forwardstopList = [stop1, stop2, stop3]#, stop4, stop5, stop6, stop7, stop8, stop9]
-
-    for stop_regex in forwardstopList:
+    for stop_regex in stopList:
         if re.search(stop_regex, sequence):
             stop_codon_list = re.finditer(stop_regex,sequence)
             for y in stop_codon_list:
-                stop_indexes_forward.append(y.end() -1)
+                stop_indexes.append(y.end())
+                if stop_regex == "TAG" or stop_regex == "TAA" or stop_regex == "TGA":
+                    stop_strand.append("+")
+                else:
+                    stop_strand.append("-")
+    
+    start_indexes_forward = []
+    stop_indexes_reverse = []
+    for x in range(len(start_strand)):
+        if start_strand[x] == "+":
+            start_indexes_forward.append(start_indexes[x] + 1)
+        else:
+            stop_indexes_reverse.append(start_indexes[x] + 1)
+    
+    stop_indexes_forward = []
+    start_indexes_reverse = []
+    for x in range(len(stop_strand)):
+        if stop_strand[x] == "+":
+            stop_indexes_forward.append(stop_indexes[x])
+        else:
+            start_indexes_reverse.append(stop_indexes[x])
     
     start_indexes_forward = sorted(start_indexes_forward)
     stop_indexes_forward = sorted(stop_indexes_forward)
-
-    start_array = np.array(start_indexes_forward)
-    stop_array = np.array(stop_indexes_forward)
-
-    distances = np.subtract(stop_array,start_array[:,None])
-    distances1 = distances +1
-    middle = np.where(distances1 <= 1, 2, distances1)
-
-    final = np.where((middle > 2) & (middle % 3 == 0), 1, middle)
+    start_forward_array = np.array(start_indexes_forward)
+    stop_forward_array = np.array(stop_indexes_forward)
     
-    minimum = np.min(final, axis=1)
+    print("Calculating distances...")
+    
+# =============================================================================
+#     distances_forward = np.subtract(stop_forward_array,start_forward_array[:,None])
+#     distances_forward = distances_forward + 1
+#     middle_forward = np.where(distances_forward <= 1, 2, distances_forward)
+#     final_forward = np.where((middle_forward > 2) & (middle_forward % 3 == 0), 1, middle_forward)
+# =============================================================================
+    
+    final_forward_list = []
+    for start_pos_forward in tqdm(start_forward_array):
+        distances_forward = stop_forward_array - start_pos_forward
+        distances_forward = distances_forward + 1
+        middle_forward = np.where(distances_forward <= 1, 2, distances_forward)
+        final_forward = list(np.where((middle_forward > 2) & (middle_forward % 3 == 0), 1, middle_forward))
+        if 1 in final_forward:
+            final_forward_list.append(final_forward.index(1))
+        else:
+            final_forward_list.append("")
         
-    itemindex = pd.DataFrame(np.argmin(final,axis=1), columns = ["index"])
-    
-    to_remove = []
-
-    for x in range(len(minimum)):
-        if not minimum[x] == 1:
-            to_remove.append(x)
-    
-    itemindex = itemindex.drop(itemindex.index[to_remove])
+    if len(final_forward_list) > 0:
+         itemindex_forward = pd.DataFrame(final_forward_list, columns = ["index"])
+    else:
+        itemindex_forward = pd.DataFrame()
         
+    to_remove_forward = []
+    for x in range(len(itemindex_forward["index"])):
+        if itemindex_forward["index"][x] == "":
+            to_remove_forward.append(x)
+    itemindex_forward = itemindex_forward.drop(itemindex_forward.index[to_remove_forward])
+        
+    locus_number = 0
     annotations = set()
-    for x in itemindex['index'].index:
+    
+    print("Generating annotations...")
+
+    for x in itemindex_forward['index'].index:
         start_codon = start_indexes_forward[x]
-        stop_codon = stop_indexes_forward[itemindex['index'][x]]
-        if not start_codon > stop_codon and stop_codon - start_codon >50:
+        stop_codon = stop_indexes_forward[itemindex_forward['index'][x]]
+        if not start_codon > stop_codon and stop_codon - start_codon >30:
             annotation = title
             annotation += "\tCRUDE\tCDS\t"
-            annotation += str(start_codon + 1)
+            annotation += str(start_codon)
             annotation += "\t"
-            annotation += str(stop_codon + 1)
+            annotation += str(stop_codon)
             annotation += "\t.\t"
             annotation += "+"
             annotation += "\t0\tID="
             annotation += title
             annotation += "_"
             annotation += str(locus_number)
-            annotation += ";product=putative_protein_region"
+            annotation += ";product=theoretical_protein"
             annotations.add(annotation)
-            
             locus_number += 1
-            
-    annotations = sorted(list(annotations), key=lambda x: int(x.split('\t')[3]))
+     
+    start_indexes_reverse = sorted(start_indexes_reverse)
+    stop_indexes_reverse = sorted(stop_indexes_reverse)
+    start_reverse_array = np.array(start_indexes_reverse)
+    stop_reverse_array = np.array(stop_indexes_reverse)
     
-    return annotations, locus_number
 
-
-def get_reverse_annotations(title, sequence, locus_number):
-
-    sequence = reverse_complement(sequence)
+# =============================================================================
+#     distances_reverse = np.subtract(stop_reverse_array, start_reverse_array[:,None])
+#     distances_reverse = distances_reverse - 1
+#     middle_reverse = np.where(distances_reverse >= -1, -2, distances_reverse)
+#     final_reverse = np.where((middle_reverse < -2) & (middle_reverse % 3 == 0), -1, middle_reverse)
+#     
+# =============================================================================
     
-    start1 = r"ATG"
-    start2 = r"TTG"
-    start3 = r"GTG"
+    final_reverse_list = []
+    for start_pos_reverse in tqdm(start_reverse_array):
+        distances_reverse = stop_reverse_array - start_pos_reverse
+        distances_reverse = distances_reverse - 1
+        middle_reverse = np.where(distances_reverse >= -1, -2, distances_reverse)
+        final_reverse = list(np.where((middle_reverse < -2) & (middle_reverse % 3 == 0), -1, middle_reverse))
+        if -1 in final_reverse:
+            final_reverse_list.append((len(final_reverse) - final_reverse[::-1].index(-1) - 1))
+        else:
+            final_reverse_list.append("")
     
-    stop1 = r"TAG"
-    stop2 = r"TAA"
-    stop3 = r"TGA"
-    
-    forwardstartList = [start1, start2, start3]
-    start_indexes_forward = []
-
-    for start_regex in forwardstartList:
-        if re.search(start_regex, sequence):
-            stop_codon_list = re.finditer(start_regex,sequence)
-            for y in stop_codon_list:
-                start_indexes_forward.append(y.start())
-    
-    stop_indexes_forward = []
-    
-    forwardstopList = [stop1, stop2, stop3]#, stop4, stop5, stop6, stop7, stop8, stop9]
-    
-    for stop_regex in forwardstopList:
-        if re.search(stop_regex, sequence):
-            stop_codon_list = re.finditer(stop_regex,sequence)
-            for y in stop_codon_list:
-                stop_indexes_forward.append(y.end() -1)
-            
-    start_indexes_forward = sorted(start_indexes_forward)
-    stop_indexes_forward = sorted(stop_indexes_forward)
-    
-    start_array = np.array(start_indexes_forward)
-    stop_array = np.array(stop_indexes_forward)
-    
-    distances = np.subtract(stop_array,start_array[:,None])
-    distances1 = distances +1
-    middle = np.where(distances1 <= 1, 2, distances1)
-    
-    final = np.where((middle > 2) & (middle % 3 == 0), 1, middle)
-    
-    minimum = np.min(final, axis=1)
-    itemindex = pd.DataFrame(np.argmin(final,axis=1), columns = ["index"])
-    
-    to_remove = []
-
-    for x in range(len(minimum)):
-        if not minimum[x] == 1:
-            to_remove.append(x)
-    
-    itemindex = itemindex.drop(itemindex.index[to_remove])
+    if len(final_reverse_list) > 0:
+         itemindex_reverse = pd.DataFrame(final_reverse_list, columns = ["index"])
+    else:
+        itemindex_reverse = pd.DataFrame()
         
-    annotations = set()
+    to_remove_reverse = []
+    for x in range(len(itemindex_reverse["index"])):
+        if itemindex_reverse["index"][x] == "":
+            to_remove_reverse.append(x)
+    itemindex_reverse = itemindex_reverse.drop(itemindex_reverse.index[to_remove_reverse])
     
-    seq_length = len(sequence)
-    for x in itemindex['index'].index:
-        start_codon = seq_length - int(start_indexes_forward[x])
-        stop_codon = seq_length - int(stop_indexes_forward[itemindex['index'][x]])
-        if not start_codon < stop_codon and start_codon - stop_codon >50:
+# =============================================================================
+#     relevant_stops = np.where(final_reverse == -1)
+#     relevant_stops_list = []
+# =============================================================================
+    
+# =============================================================================
+#     if len(relevant_stops[0]) > 0:
+#         for val in range(len(relevant_stops[0])-1):
+#             index_value = relevant_stops[1][val]
+#             if relevant_stops[0][val] == relevant_stops[0][val+1]:
+#                 index_value = relevant_stops[1][val+1]
+#             else:
+#                 relevant_stops_list.append(index_value)
+#                 
+#         relevant_stops_list.append(relevant_stops[1][len(relevant_stops[0])-1])
+#     else:
+#         pass
+#     
+# =============================================================================
+# =============================================================================
+#     itemindex_reverse = pd.DataFrame(set(relevant_stops[0]), columns = ["start index"])
+#     itemindex_reverse['stop index'] = relevant_stops_list
+# =============================================================================
+        
+    for y in itemindex_reverse['index'].index:
+        start_codon = start_indexes_reverse[y]
+        stop_codon = stop_indexes_reverse[itemindex_reverse["index"][y]]
+        if not start_codon < stop_codon and start_codon - stop_codon >30:
             annotation = title
             annotation += "\tCRUDE\tCDS\t"
             annotation += str(stop_codon)
@@ -207,22 +254,22 @@ def get_reverse_annotations(title, sequence, locus_number):
             annotation += "-"
             annotation += "\t0\tID="
             annotation += title
-            annotation += "_rv_"
+            annotation += "_"
             annotation += str(locus_number)
-            annotation += ";product=putative_protein_region"
+            annotation += ";product=theoretical_protein"
             annotations.add(annotation)
+            locus_number += 1 
             
-            locus_number += 1
             
     annotations = sorted(list(annotations), key=lambda x: int(x.split('\t')[3]))
-        
+    
     return annotations
 
 
-def generate_annotations(fnas):
+def generate_annotations(fasta_files):
     
     total_genes = []
-    for header in fnas:
+    for header in tqdm(fasta_files):
         print(header)
         with open(header) as f:
             fasta = f.read()
@@ -232,31 +279,17 @@ def generate_annotations(fnas):
         region_titles = []
         annotation_all_regions = []
         sequences_all_regions = ["##FASTA"]
-        
-        for x in range(len(split)):
-            locus_number = 0
+            
+        for x in tqdm(range(len(split))):
             title = split[x].split(" ")[0]
             fasta_split = split[x].split("\n")
             fasta_header = ">" + fasta_split[0]
             sequence = "".join(fasta_split[1:])
             sequences_all_regions.append(fasta_header)
             sequences_all_regions.append(sequence)
-            forward_annotations = []
-            reverse_annotations = []
-            
-            try:
-                forward_annotations, locus_number = get_forward_annotations(title, sequence, locus_number)
-            except:
-                pass
-            try:
-                reverse_annotations = get_reverse_annotations(title, sequence, locus_number)
-            except:
-                pass
-                
-            annotations_total = forward_annotations + reverse_annotations
-            
-            annotations = sorted(annotations_total, key=lambda x: int(x.split('\t')[3]))
-        
+
+            annotations = get_annotations(title, sequence)
+                  
             region_titles += ["##sequence-region " + title + " 1 " + str(len(sequence))]
             annotation_all_regions += annotations
         
@@ -269,24 +302,31 @@ def generate_annotations(fnas):
         
         print("writing file")
 
-        outfile_gff = open("PAnnotate/crudely_annotated_100/" + outfile_name + ".gff", "w")
+        outfile_gff = open("result3_annotated/" + outfile_name + ".gff", "w")
         outfile_gff.write(gff_file)
         outfile_gff.close()
         
         print("file written")
         
-    return "yes"
-    
+    return
+
+# =============================================================================
+# start_time = time.time()
+# fnas = glob.glob("to_crude/*.fna")
+# generate_annotations(fnas)
+# end_time = time.time()
+# print(str(end_time - start_time) + " seconds")
+# =============================================================================
 
 if __name__ == '__main__':
-
     start_time = time.time()
-    fnas = glob.glob("PAnnotate/Results1/fasta_files/*.fna")
+    fnas = glob.glob("result3_to_annotate/*.fna")
     chunks = [fnas[i::6] for i in range(6)]
     pool = Pool(processes=6)
     total = pool.map(generate_annotations, chunks)
     end_time = time.time()
     print(str(end_time - start_time) + " seconds" )
     print(str(total))
-    
+     
+
 

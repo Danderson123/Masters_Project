@@ -9,9 +9,17 @@ import pandas as pd
 from io import StringIO
 from tqdm import tqdm
 
-all_annotations = pd.read_csv("references/all_annotations.csv")
+def CorA(freq):
+    if freq >= 99:
+        value = "core"
+    else:
+        value = "accessory"
+    return value
+    
+all_annotations = pd.read_csv("REAL_prodigal_unannotated_SENSITIVE_pangenome/all_annotations.csv")
+reference_annotations = pd.read_csv("REFERENCE_GFFS/all_annotations.csv")
 
-with open("reference_pangenome/gene_presence_absence.csv", "r") as p:
+with open("reference_sparc_merged/gene_presence_absence.csv", "r") as p:
     correct_headers = p.read()
 
 split_file = correct_headers.splitlines()
@@ -36,12 +44,11 @@ def get_gene_name(ID):
         index = float("NaN")
     return index
 
-
+all_annotations = all_annotations.append(reference_annotations, ignore_index=True)
 all_annotations["Name in graph"] = all_annotations["ID"].progress_apply(get_gene_name)
 
 all_annotations.dropna(subset = ["Name in graph"], inplace=True)
 all_annotations = all_annotations.sort_values(by='Name in graph')
-all_annotations = all_annotations.drop_duplicates(subset=['Name in graph'])
 all_annotations = all_annotations.reset_index(drop=True)
 
 
@@ -49,10 +56,10 @@ gene_names = []
 frequencies = []
 
 import networkx as nx
-graph = nx.read_gml("reference_pangenome/final_graph.gml")
+graph = nx.read_gml("reference_sparc_merged/final_graph.gml")
 for value in graph.graph.values():
     num_isolates = len(value)
-                       
+
 for node in tqdm(graph._node):
     y = graph._node[node]
     gene_names.append(y["name"].lower())
@@ -69,5 +76,19 @@ gene_table = gene_table.drop_duplicates(subset=['Gene Name'])
 
 gene_table = gene_table.sort_values(by='Gene Name')
 
-all_annotations['frequency'] = gene_table["Frequency (%)"]
-all_annotations.to_csv("reference_pangenome/all_annotations.csv", index = True)
+def get_freq(name):
+    name = name.lower()
+    freq = gene_table["Frequency (%)"][list(gene_table["Gene Name"]).index(name)]
+    return freq
+
+ID_list = []
+number = 0
+for x in all_annotations["Name in graph"].index:
+    ID_list.append("PN_" + str(number))
+    number += 1
+all_annotations["New ID"] = ID_list
+all_annotations.to_csv("reference_sparc_merged/all_annotations.csv", index = False)
+
+all_annotations["Frequency (%)"] = all_annotations["Name in graph"].apply(get_freq)
+all_annotations["CorA"] = all_annotations["Frequency (%)"].apply(CorA)
+all_annotations.to_csv("reference_sparc_merged/all_annotations.csv", index = False)
