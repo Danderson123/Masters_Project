@@ -1,3 +1,7 @@
+"""
+This script was originally written by Gerry Tonkin-Hill as part of the Panaroo package. 
+I modified this script so that it will process Prodigal outputs in bulk and generate an "all_annotations.csv" file containing the features of all the Prodigal GFFs
+"""
 import sys, os
 import argparse
 from fasta import FastaReader
