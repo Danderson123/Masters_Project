@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Aug 12 17:02:29 2020
-
-@author: danielanderson
+The constructs a searcheable index from representative sequences associated with Panaroo-outputted pan-genomic graphs
 """
 
 import networkx as nx
@@ -12,9 +10,8 @@ from tqdm import tqdm
 import cobs_index as cobs
 
 def long_centroid(graph):
-    """"Translate all alignement files in path and add to single list"""
+    """extract protein sequences associated with each node and add to a single list"""
     all_proteins = []
-    
     G = nx.read_gml(graph)
     for node in G._node:
         y = G._node[node]
@@ -49,6 +46,7 @@ for protein in hundred_thousand_indexes:
     proteins.append(info)
     gene_names.append(titles[protein])
 
+#Write out indeividual files for each protein sequence
 duplicate_set = set()
 duplicate_count = 1
 for prot_index in tqdm(range(len(hundred_thousand_indexes))):
@@ -63,7 +61,8 @@ for prot_index in tqdm(range(len(hundred_thousand_indexes))):
         thou.write(info)
         thou.close()
         duplicate_count += 1
-        
+
+#Construct the index
 params = cobs.CompactIndexParameters()
 params.term_size = 10
 params.clobber = True               # overwrite output and temporary files
