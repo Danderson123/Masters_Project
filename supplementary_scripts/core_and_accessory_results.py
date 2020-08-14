@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jul 22 16:09:00 2020
-
-@author: danielanderson
+This script was used to produce the results for ROC curves assessing the perfomance of COBS index under different k-mer lengths and query thresholds. 
+Indexes can be built from the translated "centroids" associated with each Panaroo node or from a random subset of 100,000 alignment files of all clustered genes.  
 """
 from random import randint
 import cobs_index as cobs
@@ -327,11 +326,13 @@ def subset_attributes(subset_gffs_path, all_core_names, all_accessory_names):
     
 alignement_path = glob.glob("reference_pangenome/aligned_gene_sequences/*.aln.fas")
 alignement_path += glob.glob("reference_pangenome/aligned_gene_sequences/*.fasta")
+
 #all_core_names, all_accessory_names, all_proteins = translate_alignements(alignement_path)
 all_core_names, all_accessory_names, all_proteins = long_centroid("reference_pangenome/final_graph.gml")
-#os.mkdir("ini_cluster_files")
-#os.mkdir("ini_cluster_indexes")
-#os.mkdir("ini_cluster_results")
+
+os.mkdir("cluster_files")
+os.mkdir("cluster_indexes")
+os.mkdir("cluster_results")
 
 protein_file = all_proteins.split(">")[1:]
 
@@ -353,26 +354,25 @@ for protein in hundred_thousand_indexes:
     proteins.append(info)
     gene_names.append(titles[protein])
 
-#temp_dir = os.path.join(tempfile.mkdtemp(dir="ini_cluster_files"), "")
-temp_dir = "ini_cluster_files/tmp7gfg3b76/"
+temp_dir = os.path.join(tempfile.mkdtemp(dir="cluster_files"), "")
 
-#duplicate_set = set()
-#duplicate_count = 1
-#for prot_index in tqdm(range(len(hundred_thousand_indexes))):
-   # info = proteins[prot_index]
-   # if not gene_names[prot_index] in duplicate_set:
-       # thou = open(temp_dir + gene_names[prot_index] + ".txt", "w")
-       # thou.write(info)
-       # thou.close()
-       # duplicate_set.add(gene_names[prot_index])
-   # else:
-        #thou = open(temp_dir + gene_names[prot_index] + ";" + str(duplicate_count) + ".txt", "w")
-        #thou.write(info)
-        #thou.close()
-        #duplicate_count += 1
+duplicate_set = set()
+duplicate_count = 1
+for prot_index in tqdm(range(len(hundred_thousand_indexes))):
+    info = proteins[prot_index]
+    if not gene_names[prot_index] in duplicate_set:
+        thou = open(temp_dir + gene_names[prot_index] + ".txt", "w")
+        thou.write(info)
+        thou.close()
+        duplicate_set.add(gene_names[prot_index])
+    else:
+        thou = open(temp_dir + gene_names[prot_index] + ";" + str(duplicate_count) + ".txt", "w")
+        thou.write(info)
+        thou.close()
+        duplicate_count += 1
 
-#kmer_lengths = create_indexes_from_kmers(temp_dir)
-kmer_lengths = [1,2,4,6,8,10]
+kmer_lengths = create_indexes_from_kmers(temp_dir)
+
 subset_gffs_path = ["crude_annotated/GCF_000006885.1_ASM688v1_mk2.gff"]
 subset_core_names, subset_core_sequences, subset_accessory_names, subset_accessory_sequences = subset_attributes(subset_gffs_path, all_core_names, all_accessory_names)
 
@@ -383,7 +383,7 @@ search_names = [subset_accessory_names, subset_core_names, all_names]
 search_sequences = [subset_accessory_sequences, subset_core_sequences, all_sequences]
 
 for name_list in range(len(search_names)):
-    temp_results = os.path.join(tempfile.mkdtemp(dir="ini_cluster_results"), "")
+    temp_results = os.path.join(tempfile.mkdtemp(dir="cluster_results"), "")
     for query in tqdm(range(len(search_names[name_list]))):
         query_prot_sequence = search_sequences[name_list][query]
         query_prot_name = search_names[name_list][query]
