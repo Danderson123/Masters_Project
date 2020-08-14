@@ -46,7 +46,6 @@ for kmer in tqdm([1,2,4,6,8,10]):
         except:
             kmer_sens = 0
             
-            
         kmer_fpr = (Result.count("FP")) / (Result.count("FP") + Result.count("TN"))
    
         sens_fpr_local = {"sensitivity" : kmer_sens, "false positive rate" : kmer_fpr}
@@ -77,37 +76,12 @@ for kmer_length, kmer in kmer_list_dict.items():
                 sense.append(v)
             else:
                 fpr.append(v)
-                
-# =============================================================================
-#     sense_str = [str(i) for i in sense]
-#     fpr_str = [str(i) for i in fpr]
-#+  
-#     out_sense = open(str(kmer_length)+"_sense.txt", "w")
-#     out_sense.write("\n".join(sense_str))
-#     out_sense.close()
-#      
-#     out_fpr = open(str(kmer_length)+"_fpr.txt", "w")
-#     out_fpr.write("\n".join(fpr_str))
-#     out_fpr.close()
-# =============================================================================
-      
-
+  
     ax.plot(fpr, sense, label = str(kmer_length))
     ax.set_xlim([0.2,0.5])
     ax.set_ylim([0.4,1])
     ax.scatter(fpr, sense, s=15)
-# =============================================================================
-#     thresh_labels = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
-#     if kmer_length == 10:
-#         for i, txt in enumerate(thresh_labels):
-#             ax.annotate(txt, (fpr[i], sense[i]))
-#     else:
-#         pass
-     
-    #ax_2.plot(thresh_list, sense, label = str(kmer_length))
-   # ax_2.set_xlim([0,1])
-   # ax_2.set_ylim([0,1])
-   # ax_2.scatter(thresh_list, sense, s=15)
+
     
 #ax.legend(title="k-mer length", loc = 'lower right')
 ax.set_xlabel("false positive rate")
@@ -115,13 +89,7 @@ ax.set_ylabel("sensitivity")
 import numpy as np
 x = np.linspace(-5,5,100)
 ax.plot(x, x, '-k', linestyle='--', linewidth = 0.7)
-# =============================================================================
-# ax_2.legend(title="k-mer length")
-# ax_2.set_xlabel("threshold")
-# ax_2.set_ylabel("sensitivity")
-# =============================================================================
 
-#fig.savefig('centroid_core_zoomed.pdf')
+fig.savefig('centroid_core_zoomed.pdf')
 
-#fig_2.savefig('accessory_sensitivity-threshold.pdf')
 
