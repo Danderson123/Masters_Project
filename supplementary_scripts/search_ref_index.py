@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Aug 12 17:14:07 2020
-
-@author: danielanderson
+Search an index for all non-reference sequences in an "all_annotations.csv" file at different query thresholds. 
 """
 
 import cobs_index as cobs
