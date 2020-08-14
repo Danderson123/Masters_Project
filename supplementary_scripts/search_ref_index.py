@@ -87,10 +87,10 @@ all_annotations["COBS 85%"] = all_annotations.progress_apply(lambda row: identif
 all_annotations.to_csv("reference_sparc_merged/85_SEARCHED_all_annotations.csv", index = False)
 
 def count(name, list):
-    length = 644
+    length = 616
     list = "\n".join(list)
     sum = list.count(name)
-    freq = sum / 644 * 100
+    freq = sum / 616 * 100
     return freq
     
 #all_annotations["freq 75%"] = all_annotations(lambda row: count(row["COBS 75%"], list(all_annotations["COBS 75%"])), axis = 1)
