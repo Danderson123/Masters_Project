@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Jun 20 15:27:42 2020
-
-@author: danielanderson
+This script was use to retrieve the 616 SPARC project genomic sequences and functional annotations. 
+Using retrieve sequences tends to crash after ~400 isolates so this makes it easier to resume downloading if crashes occur.
+The same exclusion criteria as in "retrieve_sequences.py" are applied. 
 """
 from Bio import Entrez
 import os
@@ -21,7 +21,7 @@ for x in range(len(sample_list)):
         cleaned.append(sample_list[x])
 sample_input = ",".join(cleaned)
 
-Entrez.email = "danielanderson1@hotmail.com"
+Entrez.email = ""
 
 success = []
 for item in tqdm(range(len(cleaned))):
