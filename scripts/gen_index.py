@@ -62,6 +62,19 @@ def translate_alignements(alignement_path):
 
     return all_proteins
 
+def long_centroid(graph):
+    """extract protein sequences associated with each node and add to a single list"""
+    all_proteins = []
+    G = nx.read_gml(graph)
+    for node in G._node:
+        y = G._node[node]
+        seq = y["protein"].split(";")
+        for x in seq:
+            all_proteins.append(">" + y["name"] + "\n" + x)
+            
+    all_proteins = "\n".join(all_proteins)
+    return all_proteins
+
 def get_options(): #options for downloading and cleaning
     
     import argparse
@@ -74,7 +87,7 @@ def get_options(): #options for downloading and cleaning
                         "--input_dir",
                         dest="input_dir",
                         required=True,
-                        help='path of panaroo-outputted alignements in mafft format',
+                        help='path of panaroo-output',
                         type=str) #Specify the search term for entrez
     io_opts.add_argument("-o",
                         "--output",
@@ -87,6 +100,12 @@ def get_options(): #options for downloading and cleaning
                         help="specify kmer length for the constructed index (default = 10)",
                         default=10,
                         type=int)
+     io_opts.add_argument("--source",
+                      dest="srce",
+                      help="build index from alignments for CD-HIT representative sequences",
+                      choices=['alignment', 'centroid']
+                      default="centroid",
+                      type=int)
     io_opts.add_argument("--false_positive_rate",
                       dest="fpr",
                       help="false positive rate for index. Greater fpr means smaller index (default = 0.01).",
@@ -131,9 +150,13 @@ def create_index(input_dir, output_dir, kmer_length, fpr):
 def main():
     args = get_options()
     
-    alignement_path = glob.glob(args.input_dir + "/*.aln.fas")
-    alignement_path += glob.glob(args.input_dir + "/*.fasta")
-    all_proteins = translate_alignements(alignement_path)
+    alignement_path = glob.glob(args.input_dir + "/aligned_gene_sequences/*.aln.fas")
+    alignement_path += glob.glob(args.input_dir + "/aligned_gene_sequences/*.fasta")
+    
+    if args.srce == "alignment":
+        all_proteins = translate_alignements(alignement_path)
+    if args.srce == "centroid":
+        all_proteins = long_centroid(args.input_dir + "/final_graph.gml")   
     
     if args.dirty:
         out_file = open(args.output_dir + "/all_proteins.txt", "w")
