@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 This uses the gene_presence_absence output of panaroo to associate all input annotations with their assigned name in the pangenomic graph. 
-This is important because node organisation changes whenever you add a genome to the graph.
-
-"""
+This is important because node organisation changes whenever you add a genome to the graph. 
+It takes two CSV files containing all of the features inputted into two panaroo graphs that have been subsequently merged
+""" 
 import pandas as pd
 from io import StringIO
 from tqdm import tqdm
