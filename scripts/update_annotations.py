@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-This updates pre-existing GFF files for isolates integrated into a panaroo graph
+This updates pre-existing GFF files for isolates integrated into a panaroo graph.
+It requires sequence alignments, the graph and an "all_annotations.csv" file to supply the updated functional annotations
 """
 import networkx as nx
 import time 
@@ -278,9 +279,6 @@ def main():
     for isolate in tqdm(isolate_files):
         isolate = os.path.basename(isolate).split('.gff')[0]
         update_gff(isolate, args.gff_dir, library, args.output_dir)
-        #except:
-           # print("Error with {}.gff".format(isolate))
-            #pass
      
     print("Calculating gene frequencies...")
     
