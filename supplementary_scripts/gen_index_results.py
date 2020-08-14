@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-This script was used to generate plots for figure ..... It is used to determine the sensitivity and specificity for different: kmer lengths and number of files to determine kmer length.
+Test script for the ROC plots. 
 """
 from random import randint
 import cobs_index as cobs
