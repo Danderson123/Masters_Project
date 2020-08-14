@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jul 13 18:50:47 2020
-
-@author: danielanderson
+Plot sensitivity and false positive rate for output of "core_and_accessory_results.py"
 """
 import glob
 import pandas as pd
