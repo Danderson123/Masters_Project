@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Fri Aug  7 21:00:10 2020
-
-@author: danielanderson
+Counts the number of base pairs in the core and accessory genomes
 """
 
 
