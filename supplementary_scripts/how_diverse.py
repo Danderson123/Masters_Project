@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Aug 10 14:13:12 2020
-
-@author: danielanderson
+Calculate the percentage of nucleotides conserved across all isolates in an alignment file
 """
 
 
