@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Aug  8 18:07:14 2020
-
-@author: danielanderson
+Replace the isolate names in alignment files so they are consistent with the ML phylogeny of the overall population structure
 """
 
 def replace_all(text, dic):
@@ -46,13 +44,3 @@ for aln in alns:
             out_file.close()
         except:
             pass
-
-              
-            
-trees = glob.glob("SPARC_AMR_ALIGNMENTS/*.txt")
-for tree in trees:
-    with open(tree, "r") as g:
-        fill = g.read()
-        tren = fill.split(")")
-        en = fill.split("(")
-    print(len(en), len(tren))
