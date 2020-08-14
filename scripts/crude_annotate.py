@@ -1,22 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-This cript generates crude annotations from an input fasta file if there are no pre-existing annotations. 
-While it does not accurately predict genes, the hope is that it will run much faster than prokka and generate more annotations.
-This will improve the gene finding potential of panaroo.
-
-It will be tested on the first 10 samples from the Manhattan dataset. 
-
-Information I want to record is:
-    - number of annotations generated.
-    - time to complete all 10 sequences. 
-    - time to complete 1 sequence.
-    - number of core genes identified.
-    
-start codons for now are ATG for + and CAT for - 
-stop codons are TAG, TAA, and TGA for +
-stop codons are CTA, TTA and TCA for - 
+This script generates crude annotations from an input fasta file with no pre-existing annotations
 """
+
 
 import glob 
 from tqdm import tqdm 
@@ -128,13 +115,6 @@ def get_annotations(title, sequence):
     
     print("Calculating distances...")
     
-# =============================================================================
-#     distances_forward = np.subtract(stop_forward_array,start_forward_array[:,None])
-#     distances_forward = distances_forward + 1
-#     middle_forward = np.where(distances_forward <= 1, 2, distances_forward)
-#     final_forward = np.where((middle_forward > 2) & (middle_forward % 3 == 0), 1, middle_forward)
-# =============================================================================
-    
     final_forward_list = []
     for start_pos_forward in tqdm(start_forward_array):
         distances_forward = stop_forward_array - start_pos_forward
@@ -186,15 +166,6 @@ def get_annotations(title, sequence):
     start_reverse_array = np.array(start_indexes_reverse)
     stop_reverse_array = np.array(stop_indexes_reverse)
     
-
-# =============================================================================
-#     distances_reverse = np.subtract(stop_reverse_array, start_reverse_array[:,None])
-#     distances_reverse = distances_reverse - 1
-#     middle_reverse = np.where(distances_reverse >= -1, -2, distances_reverse)
-#     final_reverse = np.where((middle_reverse < -2) & (middle_reverse % 3 == 0), -1, middle_reverse)
-#     
-# =============================================================================
-    
     final_reverse_list = []
     for start_pos_reverse in tqdm(start_reverse_array):
         distances_reverse = stop_reverse_array - start_pos_reverse
@@ -216,30 +187,6 @@ def get_annotations(title, sequence):
         if itemindex_reverse["index"][x] == "":
             to_remove_reverse.append(x)
     itemindex_reverse = itemindex_reverse.drop(itemindex_reverse.index[to_remove_reverse])
-    
-# =============================================================================
-#     relevant_stops = np.where(final_reverse == -1)
-#     relevant_stops_list = []
-# =============================================================================
-    
-# =============================================================================
-#     if len(relevant_stops[0]) > 0:
-#         for val in range(len(relevant_stops[0])-1):
-#             index_value = relevant_stops[1][val]
-#             if relevant_stops[0][val] == relevant_stops[0][val+1]:
-#                 index_value = relevant_stops[1][val+1]
-#             else:
-#                 relevant_stops_list.append(index_value)
-#                 
-#         relevant_stops_list.append(relevant_stops[1][len(relevant_stops[0])-1])
-#     else:
-#         pass
-#     
-# =============================================================================
-# =============================================================================
-#     itemindex_reverse = pd.DataFrame(set(relevant_stops[0]), columns = ["start index"])
-#     itemindex_reverse['stop index'] = relevant_stops_list
-# =============================================================================
         
     for y in itemindex_reverse['index'].index:
         start_codon = start_indexes_reverse[y]
@@ -310,23 +257,21 @@ def generate_annotations(fasta_files):
         
     return
 
-# =============================================================================
-# start_time = time.time()
-# fnas = glob.glob("to_crude/*.fna")
-# generate_annotations(fnas)
-# end_time = time.time()
-# print(str(end_time - start_time) + " seconds")
-# =============================================================================
+start_time = time.time()
+fnas = glob.glob("to_crude/*.fna")
+generate_annotations(fnas)
+end_time = time.time()
+print(str(end_time - start_time) + " seconds")
 
-if __name__ == '__main__':
-    start_time = time.time()
-    fnas = glob.glob("result3_to_annotate/*.fna")
-    chunks = [fnas[i::6] for i in range(6)]
-    pool = Pool(processes=6)
-    total = pool.map(generate_annotations, chunks)
-    end_time = time.time()
-    print(str(end_time - start_time) + " seconds" )
-    print(str(total))
+#if __name__ == '__main__':
+#    start_time = time.time()
+#    fnas = glob.glob("result3_to_annotate/*.fna")
+#    chunks = [fnas[i::6] for i in range(6)]
+#    pool = Pool(processes=6)
+#    total = pool.map(generate_annotations, chunks)
+#    end_time = time.time()
+#    print(str(end_time - start_time) + " seconds" )
+#    print(str(total))
      
 
 
