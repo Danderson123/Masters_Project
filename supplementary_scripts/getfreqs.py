@@ -64,10 +64,9 @@ for node in G_crouch._node:
     if "pbp" in y["name"]:
        pbp = y["members"]
        pbp.append([y["name"], y["members"]])
-       
+
+#Count unannotated nodes        
 count = 0
 for x in G._node:
     if "group" in G._node[x]["name"]:
         count += 1
-        
-        45/616*100
