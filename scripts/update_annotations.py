@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-if multiple names then add synonymn
+This updates pre-existing GFF files for isolates integrated into a panaroo graph
 """
 import networkx as nx
 import time 
