@@ -4,7 +4,6 @@
 Search for AMR/virulent genes in two graphs and compare their frequencies
 """
 
-
 import networkx as nx
 
 G = nx.read_gml("final_graph.gml")
