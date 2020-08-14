@@ -3,6 +3,7 @@
 """
 This script was used to produce the results for ROC curves assessing the perfomance of COBS index under different k-mer lengths and query thresholds. 
 Indexes can be built from the translated "centroids" associated with each Panaroo node or from a random subset of 100,000 alignment files of all clustered genes.  
+A Panaroo-updated GFF file for a reference strain is then provided and searches are conducted for all genes, then core genes and accessory genes separately (based on whether the genes are core or accessory in the Panaroo output)
 """
 from random import randint
 import cobs_index as cobs
