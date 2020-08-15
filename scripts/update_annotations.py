@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-This updates pre-existing GFF files for isolates integrated into a panaroo graph.
-It requires sequence alignments, the graph and an "all_annotations.csv" file to supply the updated functional annotations
+if multiple names then add synonymn
 """
 import networkx as nx
 import time 
@@ -36,14 +35,20 @@ def get_options(): #options for downloading and cleaning
                         help='directory of panaroo-outputted mafft alignements',
                         type=str)
                         
-    io_opts.add_argument("-g",
-                     "--graph",
-                     dest="graph_dir",
+    io_opts.add_argument("-i",
+                     "--input",
+                     dest="all_file",
                      required=True,
-                     help="the directory where the graph file is located",
+                     help='Panaroo-updated "all_annotations.csv" file',
                      type=str)
                      
-                     
+    io_opts.add_argument("-g",
+                     "--graph_dir",
+                     dest="graph_dir",
+                     required=True,
+                     help='Directory of Panaroo graph',
+                     type=str)
+               
     io_opts.add_argument("--output",
                      dest="output_dir",
                      required=False,
@@ -73,11 +78,11 @@ def position_finder(sequence, fasta_information_forward, fasta_information_rever
     else:
         start_position = 0
         end_position = 0
-        strand = ''
+        strand = ""
     return start_position, end_position, strand
 
-def gff_row(start, end, strand, ID, name, sequence_region):
-    gff_line = sequence_region + '\t' + 'Panaroo' + '\t' + 'CDS' + '\t' + str(start) + '\t' + str(end) + '\t' + '.' + '\t' + str(strand) + '\t' + '.' + '\t' + ID + ';' + 'Name=' + name + ';' + 'gbkey=CDS' + ';' + 'gene=' + name + ';' + 'gene_biotype=protein_coding' #+ ';' + 'locus_tag='
+def gff_row(region, source, what_type, start, end, score, strand, phase, attributes):
+    gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + phase + '\t' + attributes
     return gff_line
     
 def generate_library(graph_path, alignement_path):
@@ -85,15 +90,16 @@ def generate_library(graph_path, alignement_path):
     G = nx.read_gml(graph_path + "final_graph.gml")
 
     refound_genes = []    
-    for node in G._node:
+    descriptions = []
+    for node in tqdm(G._node):
         y = G._node[node]
         if 'refound' in y["geneIDs"]:
             refound_genes.append(y["name"])
-        elif "~" in y["name"]:
-            refound_genes.append(y["name"])
-        elif "group" in y["name"]:
-            refound_genes.append(y["name"])
-    
+            if not y["description"] == "":
+                descriptions.append(y["description"])
+            else:
+                descriptions.append("hypothetical protein")
+            
     library = {}
     for refound_gene in tqdm(range(len(refound_genes))):
         try:
@@ -110,25 +116,26 @@ def generate_library(graph_path, alignement_path):
             isolates.append(isolate_split[0])
             cluster_split = isolate_split[1].split("\n")
             cluster.append(cluster_split[0])
-            sequence.append(''.join(cluster_split[1:]))
-        dictionary = {"Isolates" : isolates, "clusters": cluster, "Sequences" : sequence}
+            sequence.append(''.join(cluster_split[1:]).upper())
+        dictionary = {"Isolates" : isolates, "clusters": cluster, "Sequences" : sequence, 'description': descriptions[refound_gene], "name": refound_genes[refound_gene]}
         library[refound_genes[refound_gene]] = dictionary
     
     return library, G
 
-def update_gff(isolate, input_gffs, library, output_dir):
+def update_gff(isolate, input_gffs, library, output_dir, source):
         
     isolate_genes = []
     isolate_gene_sequence = []
-    
+    attributes = []
     for key, value in library.items():
         for x in range(len(value['Isolates'])):
             if value['Isolates'][x] == isolate: #and "refound" in value['clusters'][x]:
                 isolate_genes.append(key)
                 isolate_gene_sequence.append(value['Sequences'][x])
-    
+                attributes.append("ID=" + value['clusters'][x] + ";gbkey=CDS;" + ";gene=" + value['name']  + ';gene_biotype=protein_coding' + ";product=" + value['description'] + ";locus_tag=" + value['clusters'][x])
+
     filename = isolate +'.gff'
-    with open(input_gffs + '/' + filename) as gff:
+    with open(input_gffs + '' + filename) as gff:
         to_update = gff.read()
 
     split = to_update.split("##FASTA")
@@ -172,14 +179,16 @@ def update_gff(isolate, input_gffs, library, output_dir):
     for title in tqdm(range(len(titles))):
         fasta_information_forward = "".join(split_fasta[title].split('\n')[1:])
         fasta_information_reverse = reverse_complement(fasta_information_forward)
-        gff_information = annotations_split[title]
+        #gff_information = annotations_split[title]
         
         sequence_region = titles[title].split(" ")[1]
+        gff_information = source[source["region"] == sequence_region]
+        
         refound_DataFrame = pd.DataFrame(isolate_genes, columns = ['name'])
         refound_DataFrame['sequence'] = isolate_gene_sequence
-        refound_DataFrame['ID'] = 'ID='
+        refound_DataFrame['attributes'] = attributes
         
-        refound_DataFrame['searched'] = refound_DataFrame['sequence'].apply(position_finder, args=[fasta_information_forward, fasta_information_reverse])
+        refound_DataFrame['searched'] = refound_DataFrame.apply(lambda row: position_finder(row['sequence'],fasta_information_forward, fasta_information_reverse), axis = 1)
         start = []
         end = []
         strand = []
@@ -193,27 +202,47 @@ def update_gff(isolate, input_gffs, library, output_dir):
         refound_DataFrame['end'] = end
         refound_DataFrame['strand'] = strand
         
-        for annotation_row, row in refound_DataFrame.iterrows():
-            if not row['end'] == 0:
-                gff_information.append(gff_row(row["start"], row["end"], row['strand'], row['ID'], row['name'], sequence_region))
-            else:
-                pass
+        gff_information = gff_information[["region", "type", "start", "end", "strand", "phase", "attributes"]]
         
-        gff_information = sorted(gff_information, key=lambda x: int(x.split('\t')[3]))
+        refound_DataFrame["region"] = sequence_region
+        refound_DataFrame["type"] = "CDS"
+        refound_DataFrame["phase"] = "0"
         
-        positions_out = []
-        for line in gff_information:
-            positions_out.append((str(line.split('\t')[3]) + "," + str(line.split('\t')[4])))
-            
-        to_remove = []
-        for pos in range(len(positions_out)):
-            if positions_out.count(positions_out[pos]) > 1 and not "Panaroo" in gff_information[pos]:
-                to_remove.append(pos)
+        refound_DataFrame = refound_DataFrame[~(refound_DataFrame[['start','end']] == 0).any(axis=1)]
+        refound_DataFrame = refound_DataFrame[["region", "type", "start", "end", "strand", "phase", "attributes"]]
         
-        for index in sorted(to_remove, reverse=True):
-            del gff_information[index]
-            
-        gff_information = "\n".join(gff_information)
+        gff_information.append(refound_DataFrame)
+# =============================================================================
+#         for annotation_row, row in refound_DataFrame.iterrows():
+#             if not row['end'] == 0:
+#                 gff_information.append(gff_row(sequence_region, "CDS", row["start"], row["end"], row['strand'], "0", row['name'], ))
+#             else:
+#                 pass
+# =============================================================================
+        gff_information = gff_information.sort_values(by=['start'])
+        gff_information["soure"] = "Panaroo"
+        gff_information["score"] = "."
+# =============================================================================
+#         gff_information = sorted(gff_information, key=lambda x: int(x.split('\t')[3]))
+#         
+#         positions_out = []
+#         for line in gff_information:
+#             positions_out.append((str(line.split('\t')[3]) + "," + str(line.split('\t')[4])))
+#             
+#         to_remove = []
+#         for pos in range(len(positions_out)):
+#             if positions_out.count(positions_out[pos]) > 1 and not "Panaroo" in gff_information[pos]:
+#                 to_remove.append(pos)
+# =============================================================================
+        
+# =============================================================================
+#         for index in sorted(to_remove, reverse=True):
+#             del gff_information[index]
+# =============================================================================
+        
+        gff_information["line"] = gff_information.apply(lambda row: gff_row(row["region"], row["source"],row["type"],row["start"],row["end"],row["score"],row["strand"],row["phase"],row["attributes"]), axis = 1)
+       
+        gff_information = "\n".join(list(gff_information["line"]))
         contigs.append(titles[title] + "\n" + gff_information + "\n##FASTA" + "".join(split[1:]))
         
     with open(output_dir + '/' + filename, 'w') as f:
@@ -255,6 +284,7 @@ def main():
     args = get_options()
     
     args.graph_dir = os.path.join(args.graph_dir, "")
+    args.all_dir = os.path.join(args.all_dir, "")
     args.aln_dir = os.path.join(args.aln_dir, "")
     
     if args.output_dir == " ":
@@ -267,7 +297,7 @@ def main():
     print("Generating library...")
     
     library, G = generate_library(args.graph_dir, args.aln_dir)
-    
+    library, G = generate_library(graph_dir, aln_dir)
     print("Library generated")
     
     paths_gff = args.gff_dir + "/*.gff"
@@ -275,11 +305,19 @@ def main():
     isolate_files = glob.glob(paths_gff)
     
     print("Updating annotations...")
+    
+    source = pd.read_csv(args.all_file)
+    
+    for isolate in tqdm(isolate_files):
+        isolate = os.path.basename(isolate).split('.gff')[0]
+        isolate_source = source[source["Isolate"] == isolate]
+        update_gff(isolate, args.gff_dir, library, args.output_dir, isolate_source)
 
     for isolate in tqdm(isolate_files):
         isolate = os.path.basename(isolate).split('.gff')[0]
-        update_gff(isolate, args.gff_dir, library, args.output_dir)
-     
+        isolate_source = source[source["Isolate"] == isolate]
+        update_gff(isolate, gff_dir, library, output_dir, isolate_source)
+        
     print("Calculating gene frequencies...")
     
     gene_frequencies(G, args.output_dir)

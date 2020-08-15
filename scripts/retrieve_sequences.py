@@ -2,6 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 This script downloads fasta and gff files in fasta format for accessions of interest. These are then joined and cleaned for direct input into panaroo.
+
+
+- need to add support for CTG and GTG
+- need to remove ab initio predictions
 """
 import time
 import os
@@ -156,6 +160,9 @@ def split_contigs(headers, input_dir, output_dir):
     all_sequences = []
     strand = []
     isolates = []
+    regions = []
+    starts = []
+    ends = []
     
     all_raw = []
     non_cds = []
@@ -271,6 +278,7 @@ def split_contigs(headers, input_dir, output_dir):
             
             for annotation_line in range(len(output_cds)):
                 tab_splitted = output_cds[annotation_line].split('\t')
+                regions.append(tab_splitted[0])
                 source.append(tab_splitted[1])
                 type.append(tab_splitted[2])
                 phase.append(tab_splitted[7])
@@ -279,6 +287,8 @@ def split_contigs(headers, input_dir, output_dir):
                 strand.append(tab_splitted[6])
                 isolates.append(header)
                 annotation_seq = nucleotides[int(tab_splitted[3]) - 1: int(tab_splitted[4]) - 3]
+                starts.append(tab_splitted[3])
+                ends.append(tab_splitted[4])
                 if tab_splitted[6] == "+":
                     all_sequences.append(annotation_seq)
                 elif tab_splitted[6] == "-":
@@ -295,7 +305,7 @@ def split_contigs(headers, input_dir, output_dir):
         outfile.write(annotated_file)
         outfile.close()
 
-    all_files_annotations = pd.DataFrame({"Isolate": isolates, 'ID': all_gene_ids, 'source':source,'type':type, 'strand' : strand, 'phase': phase, 'attributes': attributes, 'sequence': all_sequences})
+    all_files_annotations = pd.DataFrame({"Isolate": isolates, 'ID': all_gene_ids, 'region' : regions, 'source':source,'type':type, 'start': starts, 'end': ends, 'strand' : strand, 'phase': phase, 'attributes': attributes, 'sequence': all_sequences})
     
     all_files_annotations.to_csv(output_dir + "all_annotations.csv", index=False)
     
