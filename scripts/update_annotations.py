@@ -82,7 +82,7 @@ def position_finder(sequence, fasta_information_forward, fasta_information_rever
     return start_position, end_position, strand
 
 def gff_row(region, source, what_type, start, end, score, strand, phase, attributes):
-    gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + phase + '\t' + attributes
+    gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\t' + attributes
     return gff_line
     
 def generate_library(graph_path, alignement_path):
@@ -122,7 +122,7 @@ def generate_library(graph_path, alignement_path):
     
     return library, G
 
-def update_gff(isolate, input_gffs, library, output_dir, source):
+def update_gff(isolate, input_gffs, library, output_dir, source, count):
         
     isolate_genes = []
     isolate_gene_sequence = []
@@ -132,10 +132,11 @@ def update_gff(isolate, input_gffs, library, output_dir, source):
             if value['Isolates'][x] == isolate: #and "refound" in value['clusters'][x]:
                 isolate_genes.append(key)
                 isolate_gene_sequence.append(value['Sequences'][x])
-                attributes.append("ID=" + value['clusters'][x] + ";gbkey=CDS;" + ";gene=" + value['name']  + ';gene_biotype=protein_coding' + ";product=" + value['description'] + ";locus_tag=" + value['clusters'][x])
+                attributes.append("ID=" + value['clusters'][x] + ";gbkey=CDS;" + ";gene=" + value['name']  + ';gene_biotype=protein_coding' + ";product=" + value['description'] + ";locus_tag=PN_" + str(count))
+                count += 1
 
-    filename = isolate +'.gff'
-    with open(input_gffs + '' + filename) as gff:
+    filename = isolate + '.gff'
+    with open(input_gffs + '/' + filename) as gff:
         to_update = gff.read()
 
     split = to_update.split("##FASTA")
@@ -152,7 +153,8 @@ def update_gff(isolate, input_gffs, library, output_dir, source):
         
     annotation_region = []
     annotation_indexes = []
-    for annotation in range(len(annotations) - 1):
+    
+    for annotation in range(len(annotations)-1):
         if not (annotations[annotation].split("\t")[0]) == (annotations[annotation + 1].split("\t")[0]):
             annotation_region.append(annotations[annotation].split("\t")[0])
             annotation_indexes.append(annotation)
@@ -160,13 +162,14 @@ def update_gff(isolate, input_gffs, library, output_dir, source):
     annotation_indexes.append(len(annotations) - 1)
     annotations_split = []
     
-    region_to_remove = []
-    for region_title in range(len(titles)):
-        if not titles[region_title].split(" ")[1] in annotation_region:
-            region_to_remove.append(region_title)
-    
-    for index in sorted(region_to_remove, reverse=True):
-        del titles[index]
+    if len(annotation_indexes) > 1:
+        region_to_remove = []
+        for region_title in range(len(titles)):
+            if not titles[region_title].split(" ")[1] in annotation_region:
+                region_to_remove.append(region_title)
+        
+        for index in sorted(region_to_remove, reverse=True):
+            del titles[index]
 
     start_index = 0
     for index in range(len(annotation_indexes)):
@@ -174,7 +177,7 @@ def update_gff(isolate, input_gffs, library, output_dir, source):
         item = slice(start_index, end)
         start_index = end
         annotations_split.append(annotations[item])
-    
+
     contigs = []
     for title in tqdm(range(len(titles))):
         fasta_information_forward = "".join(split_fasta[title].split('\n')[1:])
@@ -202,7 +205,7 @@ def update_gff(isolate, input_gffs, library, output_dir, source):
         refound_DataFrame['end'] = end
         refound_DataFrame['strand'] = strand
         
-        gff_information = gff_information[["region", "type", "start", "end", "strand", "phase", "attributes"]]
+        gff_information = gff_information[["region", "type", "start", "end", "strand", "phase", "attributes", "New ID"]]
         
         refound_DataFrame["region"] = sequence_region
         refound_DataFrame["type"] = "CDS"
@@ -211,7 +214,7 @@ def update_gff(isolate, input_gffs, library, output_dir, source):
         refound_DataFrame = refound_DataFrame[~(refound_DataFrame[['start','end']] == 0).any(axis=1)]
         refound_DataFrame = refound_DataFrame[["region", "type", "start", "end", "strand", "phase", "attributes"]]
         
-        gff_information.append(refound_DataFrame)
+        gff_information = gff_information.append(refound_DataFrame, ignore_index=True)
 # =============================================================================
 #         for annotation_row, row in refound_DataFrame.iterrows():
 #             if not row['end'] == 0:
@@ -220,7 +223,7 @@ def update_gff(isolate, input_gffs, library, output_dir, source):
 #                 pass
 # =============================================================================
         gff_information = gff_information.sort_values(by=['start'])
-        gff_information["soure"] = "Panaroo"
+        gff_information["source"] = "Panaroo"
         gff_information["score"] = "."
 # =============================================================================
 #         gff_information = sorted(gff_information, key=lambda x: int(x.split('\t')[3]))
@@ -239,8 +242,9 @@ def update_gff(isolate, input_gffs, library, output_dir, source):
 #         for index in sorted(to_remove, reverse=True):
 #             del gff_information[index]
 # =============================================================================
-        
-        gff_information["line"] = gff_information.apply(lambda row: gff_row(row["region"], row["source"],row["type"],row["start"],row["end"],row["score"],row["strand"],row["phase"],row["attributes"]), axis = 1)
+        gff_information = gff_information.drop_duplicates(subset=['start'])
+
+        gff_information["line"] = gff_information.apply(lambda row: gff_row(row["region"], row["source"], row["type"], row["start"], row["end"], row["score"], row["strand"], row["phase"], row["attributes"]), axis = 1)
        
         gff_information = "\n".join(list(gff_information["line"]))
         contigs.append(titles[title] + "\n" + gff_information + "\n##FASTA" + "".join(split[1:]))
@@ -249,7 +253,7 @@ def update_gff(isolate, input_gffs, library, output_dir, source):
         for item in contigs:
             f.write("%s\n" % item)
                 
-    return
+    return count
 
 def gene_frequencies(graph, output_dir):
     gene_names = []
@@ -284,7 +288,6 @@ def main():
     args = get_options()
     
     args.graph_dir = os.path.join(args.graph_dir, "")
-    args.all_dir = os.path.join(args.all_dir, "")
     args.aln_dir = os.path.join(args.aln_dir, "")
     
     if args.output_dir == " ":
@@ -297,26 +300,27 @@ def main():
     print("Generating library...")
     
     library, G = generate_library(args.graph_dir, args.aln_dir)
-    library, G = generate_library(graph_dir, aln_dir)
+    #library, G = generate_library(graph_dir, aln_dir)
     print("Library generated")
     
     paths_gff = args.gff_dir + "/*.gff"
-
+   # paths_gff = "yes" + "/*.gff"
+    
     isolate_files = glob.glob(paths_gff)
     
     print("Updating annotations...")
     
     source = pd.read_csv(args.all_file)
-    
+    count = int(source["New ID"][len(source)-1].split("PN_")[1])
     for isolate in tqdm(isolate_files):
         isolate = os.path.basename(isolate).split('.gff')[0]
         isolate_source = source[source["Isolate"] == isolate]
-        update_gff(isolate, args.gff_dir, library, args.output_dir, isolate_source)
+        count = update_gff(isolate, args.gff_dir, library, args.output_dir, isolate_source,count)
 
-    for isolate in tqdm(isolate_files):
-        isolate = os.path.basename(isolate).split('.gff')[0]
-        isolate_source = source[source["Isolate"] == isolate]
-        update_gff(isolate, gff_dir, library, output_dir, isolate_source)
+    #for isolate in tqdm(isolate_files):
+        #isolate = os.path.basename(isolate).split('.gff')[0]
+        #isolate_source = source[source["Isolate"] == isolate]
+        #update_gff(isolate, gff_dir, library, output_dir, isolate_source)
         
     print("Calculating gene frequencies...")
     
