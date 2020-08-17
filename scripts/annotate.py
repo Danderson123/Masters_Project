@@ -294,7 +294,7 @@ def write_gff(gff, source, fasta, isolate):
         titles.append("##sequence-region " + reg_name)
     
     contigs = []
-    contigs.append("## isolate " + isolate)
+    contigs.append("##isolate " + isolate)
     for title in tqdm(range(len(titles))):        
         sequence_region = region_names[title]
         gff_information = source[source["region"] == sequence_region]
