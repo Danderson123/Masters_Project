@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-
+Functionally annotate a genomic sequence using a Panaroo-output and COBS index. 
+"all_annotations.csv" file is created by retrieve_sequences.py prior to Panaroo input. 
 """
 
 import glob 
