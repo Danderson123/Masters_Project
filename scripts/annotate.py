@@ -10,7 +10,7 @@ import pandas as pd
 from io import StringIO
 from tqdm import tqdm
 import networkx as nx
-#import cobs_index as cobs
+import cobs_index as cobs
 import tempfile
 import os 
 import re
@@ -276,35 +276,38 @@ def gff_row(region, source, what_type, start, end, score, strand, phase, ID, des
             gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID +";product=" + description + ";gbkey=CDS;" + ";gene(Panaroo)=" + name + ";gene(COBS)=" + cobs + ';gene_biotype=protein_coding' + ";product=" + description + ";locus_tag=" + ID 
     else:
         gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID +";product=" + description + ";gbkey=CDS;" + ";gene=" + name + ';gene_biotype=protein_coding' + ";product=" + description + ";locus_tag=" + ID
-    return gff_line
+    return str(gff_line)
 
-def write_gff(isolate, source, fasta, output_dir, gff):
+def write_gff(gff, source, fasta):
     
-    lines = gff.splitlines()
+    with open(fasta, "r") as f:
+        split = f.read()
+        
+    lines = split.split(">")[1:]
+        
     titles = []
-    for line in range(len(lines)):
-        if "##sequence-region" in lines[line]:
-            titles.append(lines[line])
-    with open(fasta, "r") as fn:
-        split = fn.read()
+    for line in lines:
+        reg_name = (line.splitlines()[0]).split(" ")[0]
+        titles.append("##sequence-region " + reg_name)
+    
+        
     contigs = []
     for title in tqdm(range(len(titles))):        
-        sequence_region = titles[title].split(" ")[1]
+        sequence_region = titles[title]
         gff_information = source[source["region"] == sequence_region]
-        gff_information = gff_information[["region", "type", "start", "end", "strand", "phase", "attributes", "New ID", "description", "Name in graph", "COBS name", "CorA"]]
+        gff_information = gff_information[["region", "type", "start", "end", "strand", "phase", "attributes", "New ID", "description", "Name in graph", "COBS", "CorA"]]
         gff_information = gff_information.sort_values(by=['start'])
         gff_information["source"] = "Panaroo"
         gff_information["score"] = "."
         gff_information = gff_information.drop_duplicates(subset=['start'], keep='last')
 
-        gff_information["line"] = gff_information.apply(lambda row: gff_row(row["region"], row["source"], row["type"], row["start"], row["end"], row["score"], row["strand"], row["phase"], row["New ID"], row["description"], row["Name in graph"], row["COBS name"], row["CorA"]), axis = 1)
+        gff_information["line"] = gff_information.apply(lambda row: gff_row(row["region"], row["source"], row["type"], row["start"], row["end"], row["score"], row["strand"], row["phase"], row["New ID"], row["description"], row["Name in graph"], row["COBS"], row["CorA"]), axis = 1)
         gff_information = "\n".join(list(gff_information["line"]))
         contigs.append(gff_information + "\n##FASTA" + "".join(split[1:]))
     titles += contigs
     titles += ["##FASTA", split]
-    
-    filename = os.path.basename(isolate)
-    with open(output_dir + '/' + filename, 'w') as f:
+
+    with open(gff, 'w') as f:
         f.write("\n".join(titles))
             
     return 
@@ -419,22 +422,22 @@ def main():
 
 #search index
     print("Searching index...")
-    #index = cobs.Search(args.input_index)
+    index = cobs.Search(args.input_index)
     tqdm.pandas()
-    #all_annotations["COBS"] = all_annotations.progress_apply(lambda row: identify(row["strand"], row["sequence"], index, 0.85, row["Isolate"]), axis = 1)
+    all_annotations["COBS"] = all_annotations.progress_apply(lambda row: identify(row["strand"], row["sequence"], index, 0.85, row["Isolate"]), axis = 1)
 #get consensus
-    #all_annotations["consensus"] = all_annotations.progress_apply(lambda row: consensus(row["Name in graph"], row["COBS"], row["CorA"]), axis = 1)
+    all_annotations["consensus"] = all_annotations.progress_apply(lambda row: consensus(row["Name in graph"], row["COBS"], row["CorA"]), axis = 1)
     all_annotations.to_csv(args.output_dir + "/annotated_all_annotations.csv", index = False)
 
 #write out gff
-    print("Writing anntoations...")
-    for isolate in tqdm(range(len([set(isolates)]))):
+    print("Writing annotations...")
+    
+    strains = list(set(isolates))
+    for isolate in tqdm(range(len(strains))):
         fasta = genome_path[isolate]
-        print(all_annotations["Isolate"])
-        print([set(isolates)][isolate])
-        gff = temp_dir + isolates[isolate] + ".gff"
-        source = all_annotations[all_annotations["Isolate"] == [set(isolates)][isolate]]
-        #write_gff(temp_dir + [set(isolates)][isolate] + ".gff", source, fasta, args.output_dir, gff)
+        gff = args.output_dir + "/" + strains[isolate] + ".gff"
+        source = all_annotations[all_annotations["Isolate"] == strains[isolate]]
+        write_gff(gff, source, fasta)
     end = time.time()
     print(str(end-start) + " seconds")
     return 
