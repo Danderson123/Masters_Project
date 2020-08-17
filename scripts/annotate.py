@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Functionally annotate a genomic sequence using a Panaroo-output and COBS index. 
-"all_annotations.csv" file is created by retrieve_sequences.py prior to Panaroo input. 
+
 """
 
 import glob 
@@ -272,14 +271,14 @@ def consensus(panaroo, cobs, CorA):
 def gff_row(region, source, what_type, start, end, score, strand, phase, ID, description, name, cobs, CorA):
     if CorA == "accessory":
         if name == cobs:
-            gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID +";product=" + description + ";gbkey=CDS;" + ";gene=" + name + ';gene_biotype=protein_coding' + ";product=" + description + ";locus_tag=" + ID 
+            gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID + ";gbkey=CDS;" + ";gene=" + name + ';gene_biotype=protein_coding' + ";product=" + description + ";locus_tag=" + ID 
         else:
-            gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID +";product=" + description + ";gbkey=CDS;" + ";gene(Panaroo)=" + name + ";gene(COBS)=" + cobs + ';gene_biotype=protein_coding' + ";product=" + description + ";locus_tag=" + ID 
+            gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID + ";gbkey=CDS;" + ";gene(Panaroo)=" + name + ";gene(COBS)=" + cobs + ';gene_biotype=protein_coding' + ";product(Panaroo)=" + description + ";locus_tag=" + ID 
     else:
-        gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID +";product=" + description + ";gbkey=CDS;" + ";gene=" + name + ';gene_biotype=protein_coding' + ";product=" + description + ";locus_tag=" + ID
+        gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID + ";gbkey=CDS;" + ";gene=" + name + ';gene_biotype=protein_coding' + ";product=" + description + ";locus_tag=" + ID
     return str(gff_line)
 
-def write_gff(gff, source, fasta):
+def write_gff(gff, source, fasta, isolate):
     
     with open(fasta, "r") as f:
         split = f.read()
@@ -287,29 +286,35 @@ def write_gff(gff, source, fasta):
     lines = split.split(">")[1:]
         
     titles = []
-    for line in lines:
-        reg_name = (line.splitlines()[0]).split(" ")[0]
+    region_names = []
+    for l in lines:
+        reg_name = (l.splitlines()[0]).split(" ")[0]
+        region_names.append(reg_name)
         titles.append("##sequence-region " + reg_name)
     
-        
     contigs = []
+    contigs.append("## isolate " + isolate)
     for title in tqdm(range(len(titles))):        
-        sequence_region = titles[title]
+        sequence_region = region_names[title]
         gff_information = source[source["region"] == sequence_region]
         gff_information = gff_information[["region", "type", "start", "end", "strand", "phase", "attributes", "New ID", "description", "Name in graph", "COBS", "CorA"]]
         gff_information = gff_information.sort_values(by=['start'])
         gff_information["source"] = "Panaroo"
         gff_information["score"] = "."
-        gff_information = gff_information.drop_duplicates(subset=['start'], keep='last')
-
-        gff_information["line"] = gff_information.apply(lambda row: gff_row(row["region"], row["source"], row["type"], row["start"], row["end"], row["score"], row["strand"], row["phase"], row["New ID"], row["description"], row["Name in graph"], row["COBS"], row["CorA"]), axis = 1)
-        gff_information = "\n".join(list(gff_information["line"]))
-        contigs.append(gff_information + "\n##FASTA" + "".join(split[1:]))
-    titles += contigs
-    titles += ["##FASTA", split]
+        print(gff_information)
+        try:
+            gff_information["line"] = gff_information.apply(lambda row: gff_row(row["region"], row["source"], row["type"], row["start"], row["end"], row["score"], row["strand"], row["phase"], row["New ID"], row["description"], row["Name in graph"], row["COBS"], row["CorA"]), axis = 1)
+            gff_information = list(gff_information["line"])
+            gff_information = [titles[title]] + gff_information
+            gff_information = "\n".join(gff_information)
+            contigs.append(gff_information)
+        except:
+            pass
+   
+    contigs += ["##FASTA", split]
 
     with open(gff, 'w') as f:
-        f.write("\n".join(titles))
+        f.write("\n".join(contigs))
             
     return 
 
@@ -432,15 +437,16 @@ def main():
 
 #write out gff
     print("Writing annotations...")
-    
+
     strains = list(set(isolates))
     for isolate in tqdm(range(len(strains))):
-        fasta = genome_path[isolate]
+        fasta = args.input_FASTA + "/" + strains[isolate] + ".fna"
         gff = args.output_dir + "/" + strains[isolate] + ".gff"
         source = all_annotations[all_annotations["Isolate"] == strains[isolate]]
-        write_gff(gff, source, fasta)
+        write_gff(gff, source, fasta, strains[isolate])
     end = time.time()
     print(str(end-start) + " seconds")
+    
     return 
 
 main()
