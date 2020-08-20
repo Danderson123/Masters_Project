@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Functionally annotate a genomic sequence using a Panaroo-output and COBS index. 
-"all_annotations.csv" file is created by retrieve_sequences.py prior to Panaroo input. 
+Functionally annotate a genomic sequence using a Panaroo-output and COBS index.
+The "all_annotations.csv" file is created by retrieve_sequences.py prior to Panaroo input.
 """
-
-import glob 
-import subprocess 
+import glob
+import subprocess
 import pandas as pd
 from io import StringIO
 from tqdm import tqdm
 import networkx as nx
 import cobs_index as cobs
 import tempfile
-import os 
+import os
 import re
-import time
 
 def predict(temp_dir, title):
     header = os.path.basename(title).split(".fna")[0]
@@ -123,10 +121,10 @@ def get_desc(name, gene_table):
     desc = gene_table["description"][list(gene_table["Gene Name"]).index(name)]
     return desc
 
-def update_file(ref_dir, reference, all_annotations):
+def update_file(output_dir, reference, all_annotations, temp_dir):
     reference_annotations = pd.read_csv(reference + "/all_annotations.csv")
 
-    with open(ref_dir + "/gene_presence_absence.csv", "r") as p:
+    with open(temp_dir + "/gene_presence_absence.csv", "r") as p:
         correct_headers = p.read()
 
     split_file = correct_headers.splitlines()
@@ -144,6 +142,7 @@ def update_file(ref_dir, reference, all_annotations):
     tqdm.pandas()
 
     all_annotations = all_annotations.append(reference_annotations, ignore_index=True)
+
     all_annotations["Name in graph"] = all_annotations.progress_apply(lambda row: get_gene_name(row["ID"], IDs, presence_absence), axis = 1)
 
     all_annotations.dropna(subset = ["Name in graph"], inplace=True)
@@ -154,7 +153,7 @@ def update_file(ref_dir, reference, all_annotations):
     frequencies = []
     descriptions = []
 
-    graph = nx.read_gml(ref_dir + "/final_graph.gml")
+    graph = nx.read_gml(temp_dir + "/final_graph.gml")
     for value in graph.graph.values():
         num_isolates = len(value)
 
@@ -185,14 +184,14 @@ def update_file(ref_dir, reference, all_annotations):
         ID_list.append("PN_" + str(number))
         number += 1
     all_annotations["New ID"] = ID_list
-    all_annotations.to_csv(ref_dir + "/fixed_all_annotations.csv", index = False)
+    all_annotations.to_csv(output_dir + "/fixed_all_annotations.csv", index = False)
 
     all_annotations["Frequency (%)"] = all_annotations.apply(lambda row: get_freq(row["Name in graph"], gene_table), axis = 1)
     all_annotations["description"] = all_annotations.apply(lambda row: get_desc(row["Name in graph"], gene_table), axis = 1)
 
     all_annotations["CorA"] = all_annotations["Frequency (%)"].apply(CorA)
-    all_annotations.to_csv(ref_dir + "/fixed_all_annotations.csv", index = False)
-
+    all_annotations.to_csv(output_dir + "/fixed_all_annotations.csv", index = False)
+    
     return all_annotations
 
 def translate(seq): #Translate the exon sequence of the gene into its respective amino acid codes using a dictionary
@@ -272,9 +271,9 @@ def consensus(panaroo, cobs, CorA):
 def gff_row(region, source, what_type, start, end, score, strand, phase, ID, description, name, cobs, CorA):
     if CorA == "accessory":
         if name == cobs:
-            gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID + ";gbkey=CDS;" + ";gene=" + name + ';gene_biotype=protein_coding' + ";product=" + description + ";locus_tag=" + ID 
+            gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID + ";gbkey=CDS;" + ";gene=" + name + ';gene_biotype=protein_coding' + ";product=" + description + ";locus_tag=" + ID
         else:
-            gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID + ";gbkey=CDS;" + ";gene(Panaroo)=" + name + ";gene(COBS)=" + cobs + ';gene_biotype=protein_coding' + ";product(Panaroo)=" + description + ";locus_tag=" + ID 
+            gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID + ";gbkey=CDS;" + ";gene(Panaroo)=" + name + ";gene(COBS)=" + cobs + ';gene_biotype=protein_coding' + ";product(Panaroo)=" + description + ";locus_tag=" + ID
     else:
         gff_line = region + '\t' + source + '\t' + what_type + '\t' + str(start) + '\t' + str(end) + '\t' + score + '\t' + str(strand) + '\t' + str(phase) + '\tID=' + ID + ";gbkey=CDS;" + ";gene=" + name + ';gene_biotype=protein_coding' + ";product=" + description + ";locus_tag=" + ID
     return str(gff_line)
@@ -295,14 +294,13 @@ def write_gff(gff, source, fasta, isolate):
     
     contigs = []
     contigs.append("##isolate " + isolate)
-    for title in tqdm(range(len(titles))):        
+    for title in tqdm(range(len(titles))):
         sequence_region = region_names[title]
         gff_information = source[source["region"] == sequence_region]
         gff_information = gff_information[["region", "type", "start", "end", "strand", "phase", "attributes", "New ID", "description", "Name in graph", "COBS", "CorA"]]
         gff_information = gff_information.sort_values(by=['start'])
         gff_information["source"] = "Panaroo"
         gff_information["score"] = "."
-        print(gff_information)
         try:
             gff_information["line"] = gff_information.apply(lambda row: gff_row(row["region"], row["source"], row["type"], row["start"], row["end"], row["score"], row["strand"], row["phase"], row["New ID"], row["description"], row["Name in graph"], row["COBS"], row["CorA"]), axis = 1)
             gff_information = list(gff_information["line"])
@@ -311,13 +309,12 @@ def write_gff(gff, source, fasta, isolate):
             contigs.append(gff_information)
         except:
             pass
-   
     contigs += ["##FASTA", split]
 
     with open(gff, 'w') as f:
         f.write("\n".join(contigs))
             
-    return 
+    return
 
 def get_options(): #options for downloading and cleaning
     
@@ -356,7 +353,7 @@ def get_options(): #options for downloading and cleaning
     io_opts.add_argument("-o",
                         "--output",
                         dest="output_dir",
-                        required=True,  
+                        required=True,
                         help="output directory for annotated sequences",
                         type=str)
                         
@@ -371,10 +368,9 @@ def get_options(): #options for downloading and cleaning
         
 def main():
     args = get_options()
-    start = time.time()
     
-    temp_dir = os.path.join(tempfile.mkdtemp(dir=args.output_dir), "")
     genome_path = glob.glob(args.input_FASTA + "/*.fna")
+    temp_dir = tempfile.mkdtemp(dir=args.output_dir)
     
     all_gene_ids = []
     source = []
@@ -387,11 +383,12 @@ def main():
     regions = []
     starts = []
     ends = []
-    
+    import time
+    start = time.time()
     print("Predicting CDSs...")
     count = 0
     for genome in tqdm(genome_path):
-        out = predict(temp_dir, genome) #use prodigal to predict from fasta files
+        out = predict(temp_dir + "/", genome) #use prodigal to predict from fasta files
         gff_file = out
         count,agi,so,ty,st,ph,att,all,h,reg,star,en = convert(gff_file, genome, count) #convert prodigal to prokka
         
@@ -411,21 +408,23 @@ def main():
     
     all_files_annotations = pd.DataFrame({"Isolate": isolates, 'ID': all_gene_ids, 'region' : regions, 'source':source,'type':type, 'start': starts, 'end': ends, 'strand' : strand, 'phase': phase, 'attributes': attributes, 'sequence': all_sequences})
     
-    all_files_annotations.to_csv(temp_dir + "all_annotations.csv", index = False)
-
+    all_files_annotations.to_csv(temp_dir + "/all_annotations.csv", index = False)
+    
 #construct panaroo graph
     print("Generating initial graph...")
-    panaroo_command = "panaroo -i " + temp_dir + "*.gff -o " + temp_dir + "unannotated_pangenome --clean-mode moderate"
+    panaroo_command = "panaroo -i " + temp_dir + "/*.gff -o " + temp_dir + "/unannotated_pangenome --clean-mode moderate"
     subprocess.run(panaroo_command, shell = True)
     
 #merge with reference
     print("Merging with reference...")
-    merge_command = "panaroo-merge -d " + temp_dir + "unannotated_pangenome " + args.graph_dir +  " -o " + args.output_dir
+    merge_command = "panaroo-merge -d " + temp_dir + "/unannotated_pangenome " + args.graph_dir +  " -o " + temp_dir
     subprocess.run(merge_command, shell = True)
     
 #update all annotations from graph
     print("Updating all annotations file...")
-    all_annotations = update_file(args.output_dir, args.graph_dir, all_files_annotations)
+    
+    temp_dir = os.path.join(temp_dir, "")
+    all_annotations = update_file(args.output_dir, args.graph_dir, all_files_annotations, temp_dir)
 
 #search index
     print("Searching index...")
@@ -446,8 +445,9 @@ def main():
         source = all_annotations[all_annotations["Isolate"] == strains[isolate]]
         write_gff(gff, source, fasta, strains[isolate])
     end = time.time()
+    
     print(str(end-start) + " seconds")
     
-    return 
+    return
 
 main()
