@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-This script downloads fasta and gff files in fasta format for accessions of interest. 
+This script downloads fasta and gff files for accessions of interest. 
 These are then joined and cleaned for direct input into panaroo.
 """
 import time
