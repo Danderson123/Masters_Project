@@ -1,4 +1,4 @@
-# Masters Project
+# Overview
 This repository houses the scripts for my MSc in Epidemiology project "A pan-genomic functional annotation framework integrating genomic epidemiology and functional genomics". 
 
 # Motivation 
